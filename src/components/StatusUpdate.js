@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, addDoc, getDocs, query, orderBy, deleteDoc, doc, Timestamp } from 'firebase/firestore';
+import { collection, addDoc, getDocs, query, orderBy, deleteDoc, doc, Timestamp, onSnapshot } from 'firebase/firestore';
 
 function StatusUpdate({ currentUser }) {
   const [status, setStatus] = useState('');
@@ -8,27 +8,31 @@ function StatusUpdate({ currentUser }) {
   const [updates, setUpdates] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Load updates from Firestore on component mount
+  // Load updates from Firestore on component mount and listen for real-time updates
   useEffect(() => {
-    async function fetchUpdates() {
+    const q = query(collection(db, "statusUpdates"), orderBy("timestamp", "desc"));
+    
+    // Set up real-time listener
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
       try {
-        setLoading(true);
-        const q = query(collection(db, "statusUpdates"), orderBy("timestamp", "desc"));
-        const querySnapshot = await getDocs(q);
         const updatesList = querySnapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data(),
           timestamp: doc.data().timestamp.toDate().toLocaleString() // Convert Firestore timestamp
         }));
         setUpdates(updatesList);
+        setLoading(false);
       } catch (error) {
-        console.error("Error fetching updates:", error);
-      } finally {
+        console.error("Error processing updates:", error);
         setLoading(false);
       }
-    }
+    }, (error) => {
+      console.error("Error listening to updates:", error);
+      setLoading(false);
+    });
     
-    fetchUpdates();
+    // Clean up listener on component unmount
+    return () => unsubscribe();
   }, []);
 
   const handleStatusChange = (e) => {
@@ -51,15 +55,9 @@ function StatusUpdate({ currentUser }) {
         };
         
         // Add to Firestore
-        const docRef = await addDoc(collection(db, "statusUpdates"), newUpdate);
+        await addDoc(collection(db, "statusUpdates"), newUpdate);
         
-        // Update local state
-        setUpdates([{
-          id: docRef.id,
-          ...newUpdate,
-          timestamp: new Date().toLocaleString()
-        }, ...updates]);
-        
+        // Clear input field (no need to manually update state as the listener will handle it)
         setStatus('');
       } catch (error) {
         console.error("Error adding status update:", error);
@@ -67,6 +65,8 @@ function StatusUpdate({ currentUser }) {
       }
     } else if (!currentUser) {
       alert('Please sign in to post a status update!');
+    } else {
+      alert('Please enter a status message!');
     }
   };
 
@@ -74,12 +74,16 @@ function StatusUpdate({ currentUser }) {
     try {
       // Delete from Firestore
       await deleteDoc(doc(db, "statusUpdates", id));
-      
-      // Update local state
-      setUpdates(updates.filter(update => update.id !== id));
+      // No need to manually update state as the listener will handle it
     } catch (error) {
       console.error("Error deleting status update:", error);
       alert("Failed to delete status update. Please try again.");
+    }
+  };
+
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter' && currentUser) {
+      addStatus();
     }
   };
 
@@ -91,6 +95,7 @@ function StatusUpdate({ currentUser }) {
           type="text"
           value={status}
           onChange={handleStatusChange}
+          onKeyPress={handleKeyPress}
           placeholder={currentUser ? "How are you feeling today?" : "Sign in to update your status"}
           style={{width: '60%'}}
           disabled={!currentUser}
@@ -108,11 +113,14 @@ function StatusUpdate({ currentUser }) {
           <option value="😴">😴</option>
           <option value="🎮">🎮</option>
           <option value="🍕">🍕</option>
+          <option value="🎉">🎉</option>
+          <option value="🤔">🤔</option>
+          <option value="👍">👍</option>
         </select>
         <button 
           onClick={addStatus} 
           style={{marginLeft: '10px'}}
-          disabled={!currentUser}
+          disabled={!currentUser || !status.trim()}
         >
           Update
         </button>
@@ -132,6 +140,7 @@ function StatusUpdate({ currentUser }) {
               padding: '10px',
               backgroundColor: '#ffffff',
               border: '1px solid #cccccc',
+              borderRadius: '5px',
               position: 'relative'
             }}>
               <p style={{color: '#0000FF', fontWeight: 'bold'}}>
@@ -151,11 +160,15 @@ function StatusUpdate({ currentUser }) {
                     color: 'white',
                     border: 'none',
                     borderRadius: '50%',
-                    width: '20px',
-                    height: '20px',
+                    width: '24px',
+                    height: '24px',
                     fontSize: '12px',
-                    cursor: 'pointer'
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
                   }}
+                  title="Delete this update"
                 >
                   X
                 </button>

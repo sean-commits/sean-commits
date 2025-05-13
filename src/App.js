@@ -1,105 +1,105 @@
-import React, { useState, useEffect } from 'react';
-import './App.css';
-import { db } from './firebase';
-import { doc, getDoc, setDoc, increment } from 'firebase/firestore';
-// Import the image with a clearer variable name
-import hotchieImage from './0D5398D0-FF94-4ED7-BF78-B57ABDFAC0C3.jpg';
-import UserIdentification from './components/UserIdentification';
-import CalendarComponent from './components/CalendarComponent';
-import DigitalCollage from './components/DigitalCollage';
-import PetInteraction from './components/PetInteraction';
-import StickyNoteBoard from './components/StickyNoteBoard';
-import Whiteboard from './components/Whiteboard';
-import PhotoUpload from './components/PhotoUpload';
-import TrickSection from './components/TrickSection';
-import PetPhotosSection from './components/PetPhotosSection';
-import WeeklySchedule from './components/WeeklySchedule';
+import React, { useState } from 'react';
+import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import StatusUpdate from './components/StatusUpdate';
+import StickyNoteBoard from './components/StickyNoteBoard';
+import TrickSection from './components/TrickSection';
+import WeeklySchedule from './components/WeeklySchedule';
+import Whiteboard from './components/Whiteboard';
+import Auth from './components/Auth';
 
 function App() {
-  const [visitorCount, setVisitorCount] = useState(0);
-  const [currentUser, setCurrentUser] = useState('');
-
-  useEffect(() => {
-    // Update visitor counter in Firebase
-    async function updateVisitorCount() {
-      try {
-        const statsRef = doc(db, "stats", "visitors");
-        const statsDoc = await getDoc(statsRef);
-        
-        if (statsDoc.exists()) {
-          // Increment existing counter
-          await setDoc(statsRef, { count: increment(1) }, { merge: true });
-          setVisitorCount(statsDoc.data().count + 1);
-        } else {
-          // Create counter if it doesn't exist
-          await setDoc(statsRef, { count: 1 });
-          setVisitorCount(1);
-        }
-      } catch (error) {
-        console.error("Error updating visitor count:", error);
-        // Fallback to localStorage if Firebase fails
-        const storedCount = localStorage.getItem('visitorCount') || 0;
-        const newCount = parseInt(storedCount) + 1;
-        localStorage.setItem('visitorCount', newCount);
-        setVisitorCount(newCount);
-      }
-    }
-    
-    updateVisitorCount();
-  }, []);
-
-  const handleUserChange = (username) => {
-    setCurrentUser(username);
-  };
+  const [currentUser, setCurrentUser] = useState(null);
 
   return (
-    <div className="App">
-      <h1>Really Awesome Website for Lizzie</h1>
-      
-      <div className="visitor-counter">
-        <p>You are visitor number: <span className="blink">{visitorCount}</span></p>
+    <Router>
+      <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '20px' }}>
+        <header style={{
+          backgroundColor: '#6b5b95',
+          padding: '15px',
+          borderRadius: '8px',
+          marginBottom: '20px',
+          color: 'white',
+          boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+        }}>
+          <h1 style={{ margin: '0 0 10px 0', textAlign: 'center' }}>Sean and Lizzie's Page</h1>
+          
+          <nav style={{
+            display: 'flex', 
+            justifyContent: 'center',
+            flexWrap: 'wrap',
+            gap: '10px'
+          }}>
+            <Link to="/" style={navLinkStyle}>Home</Link>
+            <Link to="/status" style={navLinkStyle}>Status Updates</Link>
+            <Link to="/notes" style={navLinkStyle}>Sticky Notes</Link>
+            <Link to="/tricks" style={navLinkStyle}>Skateboard Tricks</Link>
+            <Link to="/schedule" style={navLinkStyle}>Weekly Schedule</Link>
+            <Link to="/whiteboard" style={navLinkStyle}>Whiteboard</Link>
+          </nav>
+          
+          {currentUser && (
+            <div style={{ 
+              textAlign: 'right', 
+              padding: '10px 5px', 
+              fontSize: '14px' 
+            }}>
+              Logged in as: <strong>{currentUser}</strong>
+            </div>
+          )}
+        </header>
+        
+        <main>
+          <Routes>
+            <Route path="/" element={
+              <div>
+                <Auth setCurrentUser={setCurrentUser} />
+                <div style={{ 
+                  marginTop: '30px', 
+                  padding: '20px', 
+                  backgroundColor: '#f8f9fa',
+                  borderRadius: '8px',
+                  textAlign: 'center' 
+                }}>
+                  <h2>Welcome to our page!</h2>
+                  <p>Use the navigation menu to explore all our features.</p>
+                  {!currentUser && (
+                    <p style={{ color: '#d32f2f' }}>
+                      Please sign in above to interact with our features!
+                    </p>
+                  )}
+                </div>
+              </div>
+            } />
+            <Route path="/status" element={<StatusUpdate currentUser={currentUser} />} />
+            <Route path="/notes" element={<StickyNoteBoard currentUser={currentUser} />} />
+            <Route path="/tricks" element={<TrickSection currentUser={currentUser} />} />
+            <Route path="/schedule" element={<WeeklySchedule currentUser={currentUser} />} />
+            <Route path="/whiteboard" element={<Whiteboard currentUser={currentUser} />} />
+          </Routes>
+        </main>
+        
+        <footer style={{
+          marginTop: '40px',
+          padding: '15px',
+          textAlign: 'center',
+          borderTop: '1px solid #dee2e6',
+          color: '#6c757d'
+        }}>
+          <p>&copy; 2025 Sean and Lizzie's Page | Made with ❤️</p>
+        </footer>
       </div>
-      
-      <div className="hotchie">
-        <img src={hotchieImage} alt="Hotchie" />
-      </div>
-      
-      <marquee scrollamount="3" bgcolor="#ffff00">Hello, haha, hi, hehe, tobi, hello</marquee>
-      
-      <div className="divider"></div>
-      
-      <UserIdentification onUserChange={handleUserChange} />
-      <div className="divider"></div>
-      
-      <StatusUpdate currentUser={currentUser} />
-      <div className="divider"></div>
-      
-      <CalendarComponent currentUser={currentUser} />
-      <div className="divider"></div>
-      
-      <WeeklySchedule currentUser={currentUser} />
-      <div className="divider"></div>
-      
-      <PetInteraction currentUser={currentUser} />
-      <div className="divider"></div>
-      
-      <StickyNoteBoard currentUser={currentUser} />
-      <div className="divider"></div>
-      
-      <Whiteboard currentUser={currentUser} />
-      <div className="divider"></div>
-      
-      <PhotoUpload currentUser={currentUser} />
-      <div className="divider"></div>
-      
-      <TrickSection currentUser={currentUser} />
-      <div className="divider"></div>
-      
-      <PetPhotosSection currentUser={currentUser} />
-      
-    </div>
+    </Router>
   );
 }
+
+// Styles
+const navLinkStyle = {
+  color: 'white',
+  textDecoration: 'none',
+  padding: '8px 12px',
+  borderRadius: '4px',
+  transition: 'background-color 0.3s',
+  backgroundColor: 'rgba(255, 255, 255, 0.2)'
+};
 
 export default App;
