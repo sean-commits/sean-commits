@@ -1,15 +1,14 @@
 {
   "files": {
-    "main.css": "/sean-commits/static/css/main.8b69d566.css",
-    "main.js": "/sean-commits/static/js/main.2c1f70b2.js",
-    "static/js/453.ce12b0eb.chunk.js": "/sean-commits/static/js/453.ce12b0eb.chunk.js",
+    "main.css": "/sean-commits/static/css/main.bdb18c57.css",
+    "main.js": "/sean-commits/static/js/main.1ee5fb92.js",
+    "static/media/200w.gif": "/sean-commits/static/media/200w.cbc817eb875df5e3b8d9.gif",
     "index.html": "/sean-commits/index.html",
-    "main.8b69d566.css.map": "/sean-commits/static/css/main.8b69d566.css.map",
-    "main.2c1f70b2.js.map": "/sean-commits/static/js/main.2c1f70b2.js.map",
-    "453.ce12b0eb.chunk.js.map": "/sean-commits/static/js/453.ce12b0eb.chunk.js.map"
+    "main.bdb18c57.css.map": "/sean-commits/static/css/main.bdb18c57.css.map",
+    "main.1ee5fb92.js.map": "/sean-commits/static/js/main.1ee5fb92.js.map"
   },
   "entrypoints": [
-    "static/css/main.8b69d566.css",
-    "static/js/main.2c1f70b2.js"
+    "static/css/main.bdb18c57.css",
+    "static/js/main.1ee5fb92.js"
   ]
 }
