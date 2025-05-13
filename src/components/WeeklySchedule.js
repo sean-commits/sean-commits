@@ -68,7 +68,7 @@ function WeeklySchedule({ currentUser }) {
 
   return (
     <div className="container">
-      <h2>📅 Weekly Schedule 📅</h2>
+      <h2>Weekly Schedule</h2>
       
       <div style={{
         border: '2px solid #3399ff',

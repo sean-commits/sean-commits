@@ -1,5 +1,5 @@
 body {
-  background-image: url('https://i.imgur.com/JYvQwLj.gif');
+  background-image: url('200w.gif');
   font-family: 'Comic Sans MS', 'Times New Roman', serif;
   margin: 0;
   padding: 0;
@@ -78,9 +78,44 @@ input, select {
   margin: 20px 0;
 }
 
+/* New hotchie styling */
+.hotchie {
+  text-align: center;
+  margin: 20px auto;
+  padding: 10px;
+  background-color: #ffccff; /* Light pink background */
+  border: 3px ridge #ff66ff; /* Ridge border - very 2000s */
+  max-width: 450px;
+  border-radius: 15px;
+}
+
+.hotchie img {
+  width: 300px; 
+  max-width: 100%;
+  height: auto;
+  border: 5px solid #ffffff;
+  box-shadow: 0 0 10px #ff00ff; /* Glow effect */
+  transition: transform 0.3s; /* Smooth transition for hover effect */
+}
+
+.hotchie img:hover {
+  transform: scale(1.05); /* Slight zoom on hover */
+  border-color: #ffcc00; /* Change border color on hover */
+}
+
+/* Add a caption below the image */
+.hotchie::after {
+  content: "Hotchie!";
+  display: block;
+  margin-top: 10px;
+  font-weight: bold;
+  color: #ff3399;
+  font-size: 18px;
+}
+
 .divider {
   height: 20px;
-  background: url('https://i.imgur.com/7nrF8bE.gif') repeat-x;
+  background: url('200w.gif') repeat-x;
   margin: 20px 0;
 }
 
@@ -93,4 +128,49 @@ input, select {
 
 .blink {
   animation: blink 1s infinite;
+}
+
+.visitor-counter {
+  text-align: center;
+  font-weight: bold;
+  margin: 10px 0;
+  color: #ff0000;
+  background-color: #ffff99;
+  border: 3px dashed #ff0000;
+  padding: 10px;
+  max-width: 80%;
+  margin: 15px auto;
+}
+
+.visitor-message {
+  color: #0000ff;
+  font-size: 14px;
+  margin: 8px 0;
+}
+
+.visitor-disclaimer {
+  color: #666666;
+  font-size: 8px;
+  margin-top: 5px;
+}
+
+.fake-link {
+  color: #0000ff;
+  text-decoration: underline;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+/* Enhanced blinking effect */
+@keyframes rainbow-blink {
+  0% { color: #ff0000; opacity: 1; }
+  25% { color: #ffcc00; opacity: 0.8; }
+  50% { color: #33cc33; opacity: 0.5; }
+  75% { color: #3399ff; opacity: 0.8; }
+  100% { color: #ff0000; opacity: 1; }
+}
+
+.blink {
+  animation: rainbow-blink 0.5s infinite;
+  font-weight: bold;
 }

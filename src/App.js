@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import './App.css';
 import { db } from './firebase';
 import { doc, getDoc, setDoc, increment } from 'firebase/firestore';
+// Import the image with a clearer variable name
+import hotchieImage from './0D5398D0-FF94-4ED7-BF78-B57ABDFAC0C3.jpg';
 import UserIdentification from './components/UserIdentification';
 import CalendarComponent from './components/CalendarComponent';
 import DigitalCollage from './components/DigitalCollage';
@@ -53,17 +55,17 @@ function App() {
 
   return (
     <div className="App">
-      <h1>Sean & Lizzie's Relationship Site</h1>
+      <h1>Really Awesome Website for Lizzie</h1>
       
       <div className="visitor-counter">
         <p>You are visitor number: <span className="blink">{visitorCount}</span></p>
       </div>
       
-      <div className="under-construction">
-        <img src="https://i.imgur.com/JYOcQgJ.gif" alt="Under Construction" />
+      <div className="hotchie">
+        <img src={hotchieImage} alt="Hotchie" />
       </div>
       
-      <marquee scrollamount="3" bgcolor="#ffff00">Welcome to our site! We're so happy you're here! ♥♥♥</marquee>
+      <marquee scrollamount="3" bgcolor="#ffff00">Hello, haha, hi, hehe, tobi, hello</marquee>
       
       <div className="divider"></div>
       
@@ -96,13 +98,6 @@ function App() {
       
       <PetPhotosSection currentUser={currentUser} />
       
-      <div className="footer">
-        <p>© 2023 Sean & Lizzie | Best viewed in Internet Explorer 6.0 | 800x600 resolution</p>
-        <div style={{textAlign: 'center'}}>
-          <img src="https://i.imgur.com/wZBbMnE.gif" alt="Email" />
-          <img src="https://i.imgur.com/UxHBpfl.gif" alt="Valid HTML" />
-        </div>
-      </div>
     </div>
   );
 }

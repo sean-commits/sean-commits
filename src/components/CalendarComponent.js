@@ -56,7 +56,7 @@ function CalendarComponent() {
 
   return (
     <div className="container">
-      <h2>📅 Our Special Dates 📅</h2>
+      <h2>Times we have done the deed</h2>
       <div style={{display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
         <Calendar onChange={onChange} value={date} />
         

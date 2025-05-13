@@ -107,7 +107,7 @@ function Whiteboard({ currentUser }) {
 
   return (
     <div className="container">
-      <h2>🎨 MS Paint 🎨</h2>
+      <h2>Whiteboard</h2>
       
       <div style={{textAlign: 'center', marginBottom: '10px'}}>
         <label style={{marginRight: '10px'}}>

@@ -121,7 +121,7 @@ function PhotoUpload({ currentUser }) {
 
   return (
     <div className="container">
-      <h2>📸 Photo Album 📸</h2>
+      <h2>Photos</h2>
       
       <div style={{
         border: '2px solid #9933cc',

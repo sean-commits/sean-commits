@@ -97,7 +97,7 @@ function PetPhotosSection({ currentUser }) {
 
   return (
     <div className="container">
-      <h2>🐾 Pet Photos 🐾</h2>
+      <h2>Photos of our very awesome cool pets</h2>
       
       <div style={{
         border: '2px solid #ff6699',

@@ -69,7 +69,7 @@ function TrickSection({ currentUser }) {
 
   return (
     <div className="container">
-      <h2>🛹 Skateboarding Tricks 🛹</h2>
+      <h2>Sean's tricks</h2>
       
       <div style={{
         border: '2px solid #33cc33',

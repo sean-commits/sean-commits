@@ -48,7 +48,7 @@ function StickyNoteBoard({ currentUser }) {
 
   return (
     <div className="container">
-      <h2>📝 Sticky Notes 📝</h2>
+      <h2>Sticky Notes</h2>
       <div style={{textAlign: 'center', marginBottom: '20px'}}>
         <textarea
           value={newNote}
