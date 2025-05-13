@@ -1,0 +1,25 @@
+   .calendar-component {
+     background-color: #f0e68c;
+     padding: 20px;
+     border-radius: 15px;
+     box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
+   }
+
+   h2 {
+     color: #4b0082;
+   }
+
+   .react-calendar {
+     width: 100%;
+     max-width: 500px;
+     background-color: white;
+     border-radius: 10px;
+     box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+     font-family: 'Comic Sans MS', cursive, sans-serif;
+     line-height: 1.125em;
+   }
+
+   .react-calendar__tile--active {
+     background: #ffeb3b !important;
+     color: black !important;
+   }
