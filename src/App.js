@@ -15,8 +15,7 @@ import WeeklySchedule from './components/WeeklySchedule';
 import StatusUpdate from './components/StatusUpdate';
 
 function App() {
-  // Instead of a simple number, use a ridiculous value
-  const [visitorCount, setVisitorCount] = useState("999,999,997");
+  const [visitorCount, setVisitorCount] = useState(0);
   const [currentUser, setCurrentUser] = useState('');
 
   useEffect(() => {
@@ -27,20 +26,21 @@ function App() {
         const statsDoc = await getDoc(statsRef);
         
         if (statsDoc.exists()) {
-          // Generate a humorous visitor number
-          // This creates a number between 999,999,800 and 999,999,999
-          const baseNumber = 999999800;
-          const randomOffset = Math.floor(Math.random() * 199);
-          setVisitorCount(baseNumber + randomOffset);
+          // Increment existing counter
+          await setDoc(statsRef, { count: increment(1) }, { merge: true });
+          setVisitorCount(statsDoc.data().count + 1);
         } else {
           // Create counter if it doesn't exist
-          await setDoc(statsRef, { count: 999999800 });
-          setVisitorCount(999999800);
+          await setDoc(statsRef, { count: 1 });
+          setVisitorCount(1);
         }
       } catch (error) {
         console.error("Error updating visitor count:", error);
-        // Fallback with a funny number
-        setVisitorCount("999,999,8" + Math.floor(Math.random() * 99));
+        // Fallback to localStorage if Firebase fails
+        const storedCount = localStorage.getItem('visitorCount') || 0;
+        const newCount = parseInt(storedCount) + 1;
+        localStorage.setItem('visitorCount', newCount);
+        setVisitorCount(newCount);
       }
     }
     
@@ -51,28 +51,38 @@ function App() {
     setCurrentUser(username);
   };
 
+  // Image styling object
+  const imageStyle = {
+    width: '300px',
+    height: 'auto',
+    maxWidth: '100%',
+    borderRadius: '8px',
+    boxShadow: '0 4px 8px rgba(0, 0, 0, 0.2)',
+    margin: '20px auto',
+    display: 'block'
+  };
+
+  // Container styling object
+  const hotchieContainerStyle = {
+    textAlign: 'center',
+    padding: '10px',
+    margin: '15px auto',
+    maxWidth: '500px'
+  };
+
   return (
     <div className="App">
       <h1>Really Awesome Website for Lizzie</h1>
       
       <div className="visitor-counter">
-        <p>
-          <span className="blink">⚠️</span> 
-          CONGRATULATIONS! You are visitor number <span className="blink">{visitorCount}</span>! 
-          <span className="blink">⚠️</span>
-        </p>
-        <p className="visitor-message">
-          You're the 999,999,999th visitor! Click <span className="fake-link">HERE</span> to claim your FREE iPad Pro!*
-        </p>
-        <p className="visitor-disclaimer">
-          *Not actually free. iPad Pro not included. Void where prohibited. Clicking will do nothing because it's just a nostalgic joke.
-        </p>
+        <p>You are visitor number: <span className="blink">{visitorCount}</span></p>
       </div>
       
-      <div className="hotchie">
+      <div className="hotchie" style={hotchieContainerStyle}>
         <img 
-          src={`${process.env.PUBLIC_URL}/0D5398D0-FF94-4ED7-BF78-B57ABDFAC0C3.jpg`} 
+          src="/0D5398D0-FF94-4ED7-BF78-B57ABDFAC0C3.jpg" 
           alt="Hotchie" 
+          style={imageStyle} 
         />
       </div>
       

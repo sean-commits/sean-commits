@@ -1,0 +1,14 @@
+{
+  "files": {
+    "main.css": "/sean-commits/static/css/main.bdb18c57.css",
+    "main.js": "/sean-commits/static/js/main.1ee5fb92.js",
+    "static/media/200w.gif": "/sean-commits/static/media/200w.cbc817eb875df5e3b8d9.gif",
+    "index.html": "/sean-commits/index.html",
+    "main.bdb18c57.css.map": "/sean-commits/static/css/main.bdb18c57.css.map",
+    "main.1ee5fb92.js.map": "/sean-commits/static/js/main.1ee5fb92.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.bdb18c57.css",
+    "static/js/main.1ee5fb92.js"
+  ]
+}
