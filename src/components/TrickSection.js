@@ -274,7 +274,7 @@ function TrickSection({ currentUser }) {
         {loading ? (
           <p style={{textAlign: 'center'}}>Loading trick videos...</p>
         ) : tricks.length === 0 ? (
-          <p style={{textAlign: 'center'}}>No trick videos uploaded yet. Show off your skills!</p>
+          <p style={{textAlign: 'center'}}>Nothing here...</p>
         ) : (
           <div style={{
             display: 'flex',
