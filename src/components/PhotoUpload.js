@@ -1,23 +1,38 @@
 import React, { useState, useEffect } from 'react';
+import { db, storage } from '../firebase';
+import { collection, addDoc, getDocs, query, orderBy, deleteDoc, doc, Timestamp } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 
 function PhotoUpload({ currentUser }) {
   const [photos, setPhotos] = useState([]);
   const [title, setTitle] = useState('');
   const [selectedFile, setSelectedFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
 
-  // Load photos from localStorage on component mount
+  // Load photos from Firestore on component mount
   useEffect(() => {
-    const storedPhotos = localStorage.getItem('uploadedPhotos');
-    if (storedPhotos) {
-      setPhotos(JSON.parse(storedPhotos));
+    async function fetchPhotos() {
+      try {
+        setLoading(true);
+        const q = query(collection(db, "photos"), orderBy("timestamp", "desc"));
+        const querySnapshot = await getDocs(q);
+        const photoList = querySnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+          timestamp: doc.data().timestamp.toDate().toLocaleString()
+        }));
+        setPhotos(photoList);
+      } catch (error) {
+        console.error("Error fetching photos:", error);
+      } finally {
+        setLoading(false);
+      }
     }
+    
+    fetchPhotos();
   }, []);
-
-  // Save photos to localStorage whenever they change
-  useEffect(() => {
-    localStorage.setItem('uploadedPhotos', JSON.stringify(photos));
-  }, [photos]);
 
   const handleFileChange = (e) => {
     if (e.target.files && e.target.files[0]) {
@@ -37,7 +52,7 @@ function PhotoUpload({ currentUser }) {
     setTitle(e.target.value);
   };
 
-  const uploadPhoto = () => {
+  const uploadPhoto = async () => {
     if (!currentUser) {
       alert('Please sign in to upload photos!');
       return;
@@ -48,22 +63,60 @@ function PhotoUpload({ currentUser }) {
       return;
     }
 
-    const newPhoto = {
-      id: Date.now(),
-      url: previewUrl,
-      title: title || 'Untitled Photo',
-      user: currentUser,
-      timestamp: new Date().toLocaleString()
-    };
-
-    setPhotos([newPhoto, ...photos]);
-    setTitle('');
-    setSelectedFile(null);
-    setPreviewUrl('');
+    try {
+      setUploading(true);
+      
+      // 1. Upload file to Firebase Storage
+      const storageRef = ref(storage, `photos/${Date.now()}_${selectedFile.name}`);
+      await uploadBytes(storageRef, selectedFile);
+      const downloadURL = await getDownloadURL(storageRef);
+      
+      // 2. Save metadata to Firestore
+      const photoData = {
+        title: title || 'Untitled Photo',
+        url: downloadURL,
+        storagePath: storageRef.fullPath,
+        user: currentUser,
+        timestamp: Timestamp.now()
+      };
+      
+      const docRef = await addDoc(collection(db, "photos"), photoData);
+      
+      // 3. Update local state
+      setPhotos([{
+        id: docRef.id,
+        ...photoData,
+        timestamp: new Date().toLocaleString()
+      }, ...photos]);
+      
+      // 4. Reset form
+      setTitle('');
+      setSelectedFile(null);
+      setPreviewUrl('');
+      
+    } catch (error) {
+      console.error("Error uploading photo:", error);
+      alert("Failed to upload photo. Please try again.");
+    } finally {
+      setUploading(false);
+    }
   };
 
-  const deletePhoto = (id) => {
-    setPhotos(photos.filter(photo => photo.id !== id));
+  const deletePhoto = async (id, storagePath) => {
+    try {
+      // 1. Delete from Firestore
+      await deleteDoc(doc(db, "photos", id));
+      
+      // 2. Delete from Storage
+      const fileRef = ref(storage, storagePath);
+      await deleteObject(fileRef);
+      
+      // 3. Update local state
+      setPhotos(photos.filter(photo => photo.id !== id));
+    } catch (error) {
+      console.error("Error deleting photo:", error);
+      alert("Failed to delete photo. Please try again.");
+    }
   };
 
   return (
@@ -83,7 +136,7 @@ function PhotoUpload({ currentUser }) {
             type="file" 
             accept="image/*" 
             onChange={handleFileChange}
-            disabled={!currentUser}
+            disabled={!currentUser || uploading}
             style={{marginBottom: '10px'}}
           />
           
@@ -107,16 +160,16 @@ function PhotoUpload({ currentUser }) {
             placeholder="Enter a title for your photo"
             value={title}
             onChange={handleTitleChange}
-            disabled={!currentUser}
+            disabled={!currentUser || uploading}
             style={{margin: '10px 0', width: '80%'}}
           />
           
           <button 
             onClick={uploadPhoto}
-            disabled={!currentUser || !selectedFile}
+            disabled={!currentUser || !selectedFile || uploading}
             style={{marginTop: '10px'}}
           >
-            Upload Photo
+            {uploading ? 'Uploading...' : 'Upload Photo'}
           </button>
         </div>
       </div>
@@ -126,7 +179,9 @@ function PhotoUpload({ currentUser }) {
           Photo Gallery
         </h3>
         
-        {photos.length === 0 ? (
+        {loading ? (
+          <p style={{textAlign: 'center'}}>Loading photos...</p>
+        ) : photos.length === 0 ? (
           <p style={{textAlign: 'center'}}>No photos uploaded yet. Be the first!</p>
         ) : (
           <div style={{
@@ -159,24 +214,26 @@ function PhotoUpload({ currentUser }) {
                 <p style={{margin: '0', fontSize: '12px'}}>Uploaded by: {photo.user}</p>
                 <p style={{margin: '0', fontSize: '10px', color: '#666'}}>{photo.timestamp}</p>
                 
-                <button 
-                  onClick={() => deletePhoto(photo.id)}
-                  style={{
-                    position: 'absolute',
-                    top: '5px',
-                    right: '5px',
-                    backgroundColor: '#ff6666',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '50%',
-                    width: '20px',
-                    height: '20px',
-                    fontSize: '12px',
-                    cursor: 'pointer'
-                  }}
-                >
-                  X
-                </button>
+                {currentUser === photo.user && (
+                  <button 
+                    onClick={() => deletePhoto(photo.id, photo.storagePath)}
+                    style={{
+                      position: 'absolute',
+                      top: '5px',
+                      right: '5px',
+                      backgroundColor: '#ff6666',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '50%',
+                      width: '20px',
+                      height: '20px',
+                      fontSize: '12px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    X
+                  </button>
+                )}
               </div>
             ))}
           </div>

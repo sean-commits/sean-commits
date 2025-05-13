@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import './App.css';
+import { db } from './firebase';
+import { doc, getDoc, setDoc, increment } from 'firebase/firestore';
 import UserIdentification from './components/UserIdentification';
 import CalendarComponent from './components/CalendarComponent';
 import DigitalCollage from './components/DigitalCollage';
@@ -17,11 +19,32 @@ function App() {
   const [currentUser, setCurrentUser] = useState('');
 
   useEffect(() => {
-    // Simulate visitor counter
-    const storedCount = localStorage.getItem('visitorCount') || 0;
-    const newCount = parseInt(storedCount) + 1;
-    localStorage.setItem('visitorCount', newCount);
-    setVisitorCount(newCount);
+    // Update visitor counter in Firebase
+    async function updateVisitorCount() {
+      try {
+        const statsRef = doc(db, "stats", "visitors");
+        const statsDoc = await getDoc(statsRef);
+        
+        if (statsDoc.exists()) {
+          // Increment existing counter
+          await setDoc(statsRef, { count: increment(1) }, { merge: true });
+          setVisitorCount(statsDoc.data().count + 1);
+        } else {
+          // Create counter if it doesn't exist
+          await setDoc(statsRef, { count: 1 });
+          setVisitorCount(1);
+        }
+      } catch (error) {
+        console.error("Error updating visitor count:", error);
+        // Fallback to localStorage if Firebase fails
+        const storedCount = localStorage.getItem('visitorCount') || 0;
+        const newCount = parseInt(storedCount) + 1;
+        localStorage.setItem('visitorCount', newCount);
+        setVisitorCount(newCount);
+      }
+    }
+    
+    updateVisitorCount();
   }, []);
 
   const handleUserChange = (username) => {
