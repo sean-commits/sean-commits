@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import './App.css';
 import { db } from './firebase';
 import { doc, getDoc, setDoc, increment } from 'firebase/firestore';
+// Import the image with a clearer variable name
+import hotchieImage from './0D5398D0-FF94-4ED7-BF78-B57ABDFAC0C3.jpg';
 import UserIdentification from './components/UserIdentification';
 import CalendarComponent from './components/CalendarComponent';
 import DigitalCollage from './components/DigitalCollage';
@@ -51,25 +53,6 @@ function App() {
     setCurrentUser(username);
   };
 
-  // Image styling object
-  const imageStyle = {
-    width: '300px',
-    height: 'auto',
-    maxWidth: '100%',
-    borderRadius: '8px',
-    boxShadow: '0 4px 8px rgba(0, 0, 0, 0.2)',
-    margin: '20px auto',
-    display: 'block'
-  };
-
-  // Container styling object
-  const hotchieContainerStyle = {
-    textAlign: 'center',
-    padding: '10px',
-    margin: '15px auto',
-    maxWidth: '500px'
-  };
-
   return (
     <div className="App">
       <h1>Really Awesome Website for Lizzie</h1>
@@ -78,15 +61,11 @@ function App() {
         <p>You are visitor number: <span className="blink">{visitorCount}</span></p>
       </div>
       
-      <div className="hotchie" style={hotchieContainerStyle}>
-        <img 
-          src="/0D5398D0-FF94-4ED7-BF78-B57ABDFAC0C3.jpg" 
-          alt="Hotchie" 
-          style={imageStyle} 
-        />
+      <div className="hotchie">
+        <img src={hotchieImage} alt="Hotchie" />
       </div>
       
-      <marquee scrollamount="3" bgcolor="#ffff00">Welcome to our site! We're so happy you're here! ♥♥♥</marquee>
+      <marquee scrollamount="3" bgcolor="#ffff00">Hello, haha, hi, hehe, tobi, hello</marquee>
       
       <div className="divider"></div>
       
