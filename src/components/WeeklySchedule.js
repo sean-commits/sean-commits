@@ -9,8 +9,7 @@ import {
   orderBy, 
   Timestamp, 
   onSnapshot, 
-  where,
-  getDocs
+  getDoc
 } from 'firebase/firestore';
 
 function WeeklySchedule({ currentUser }) {
@@ -29,16 +28,21 @@ function WeeklySchedule({ currentUser }) {
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
   const [loading, setLoading] = useState(true);
-  
+  const [error, setError] = useState(null);
+
   // Load schedules from Firestore on component mount
   useEffect(() => {
+    if (!db) {
+      setError("Database connection failed. Please refresh the page.");
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     
     // Create a query to get all schedule activities
-    const q = query(
-      collection(db, "weeklySchedule"),
-      orderBy("startTimeSort", "asc") // This will sort activities by start time
-    );
+    const schedulesRef = collection(db, "weeklySchedule");
+    const q = query(schedulesRef, orderBy("startTimeSort", "asc"));
     
     // Set up real-time listener
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
@@ -53,7 +57,7 @@ function WeeklySchedule({ currentUser }) {
           Sunday: []
         };
         
-        querySnapshot.docs.forEach(doc => {
+        querySnapshot.forEach(doc => {
           const data = doc.data();
           const activity = {
             id: doc.id,
@@ -61,7 +65,7 @@ function WeeklySchedule({ currentUser }) {
             startTime: data.startTime || 'All day',
             endTime: data.endTime || '',
             user: data.user,
-            timestamp: data.timestamp.toDate().toLocaleString() // Convert Firestore timestamp
+            timestamp: data.timestamp?.toDate ? data.timestamp.toDate() : new Date()
           };
           
           // Add to the appropriate day
@@ -72,12 +76,15 @@ function WeeklySchedule({ currentUser }) {
         
         setSchedules(scheduleData);
         setLoading(false);
+        setError(null);
       } catch (error) {
         console.error("Error processing schedule data:", error);
+        setError("Failed to load schedule data. Please refresh the page.");
         setLoading(false);
       }
     }, (error) => {
       console.error("Error listening to schedules:", error);
+      setError("Failed to connect to the database. Please refresh the page.");
       setLoading(false);
     });
     
@@ -87,16 +94,18 @@ function WeeklySchedule({ currentUser }) {
 
   const addActivity = async () => {
     if (!currentUser) {
-      alert('Please sign in to update the schedule!');
+      setError('Please sign in to update the schedule!');
       return;
     }
 
     if (!activity.trim()) {
-      alert('Please enter an activity!');
+      setError('Please enter an activity!');
       return;
     }
 
     try {
+      setError(null);
+      
       // Create a numeric value for sorting by time
       let startTimeSort = 0;
       if (startTime) {
@@ -115,8 +124,11 @@ function WeeklySchedule({ currentUser }) {
         timestamp: Timestamp.now()
       };
       
+      console.log("Adding to Firestore:", newActivity);
+      
       // Add to Firestore
-      await addDoc(collection(db, "weeklySchedule"), newActivity);
+      const docRef = await addDoc(collection(db, "weeklySchedule"), newActivity);
+      console.log("Document written with ID: ", docRef.id);
       
       // Reset form
       setActivity('');
@@ -124,34 +136,38 @@ function WeeklySchedule({ currentUser }) {
       setEndTime('');
     } catch (error) {
       console.error("Error adding schedule activity:", error);
-      alert("Failed to add to schedule. Please try again.");
+      setError("Failed to add to schedule. Please try again.");
     }
   };
 
   const deleteActivity = async (id) => {
     try {
+      setError(null);
+      
       // Get the activity to check ownership
       const activityRef = doc(db, "weeklySchedule", id);
-      const activitySnap = await getDocs(query(
-        collection(db, "weeklySchedule"),
-        where("__name__", "==", id)
-      ));
+      const activitySnap = await getDoc(activityRef);
       
-      if (!activitySnap.empty) {
-        const activityData = activitySnap.docs[0].data();
+      if (activitySnap.exists()) {
+        const activityData = activitySnap.data();
         
         // Only allow deletion if current user matches the activity creator
         if (currentUser !== activityData.user) {
-          alert("You can only delete activities you've added!");
+          setError("You can only delete activities you've added!");
           return;
         }
         
+        console.log("Deleting activity with ID:", id);
+        
         // Delete from Firestore
         await deleteDoc(activityRef);
+        console.log("Activity successfully deleted");
+      } else {
+        setError("Activity not found. It may have been deleted already.");
       }
     } catch (error) {
       console.error("Error deleting activity:", error);
-      alert("Failed to delete activity. Please try again.");
+      setError("Failed to delete activity. Please try again.");
     }
   };
 
@@ -164,6 +180,20 @@ function WeeklySchedule({ currentUser }) {
   return (
     <div className="container">
       <h2>Weekly Schedule</h2>
+      
+      {error && (
+        <div style={{
+          padding: '10px',
+          margin: '10px 0',
+          backgroundColor: '#fff0f0',
+          border: '1px solid #ffcccc',
+          borderRadius: '4px',
+          color: '#cc0000',
+          textAlign: 'center'
+        }}>
+          {error}
+        </div>
+      )}
       
       <div style={{
         border: '2px solid #3399ff',
