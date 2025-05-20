@@ -9,8 +9,7 @@ import {
   orderBy, 
   Timestamp, 
   onSnapshot, 
-  where,
-  getDocs 
+  where
 } from 'firebase/firestore';
 import {
   ref,
@@ -27,6 +26,7 @@ function Whiteboard({ currentUser }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [pointerEvents, setPointerEvents] = useState(true);
+  const [error, setError] = useState(null);
   
   // Track drawing state with useRef to avoid dependency issues in useEffect
   const drawingState = useRef({
@@ -37,8 +37,10 @@ function Whiteboard({ currentUser }) {
 
   // Load saved drawings from Firestore on component mount
   useEffect(() => {
+    // Filter for only whiteboard drawing entries in the statusUpdates collection
     const q = query(
-      collection(db, "whiteboardDrawings"), 
+      collection(db, "statusUpdates"),
+      where("type", "==", "whiteboardDrawing"),
       orderBy("timestamp", "desc")
     );
     
@@ -54,10 +56,12 @@ function Whiteboard({ currentUser }) {
         setLoading(false);
       } catch (error) {
         console.error("Error processing drawings:", error);
+        setError("Failed to load drawings. Please refresh the page.");
         setLoading(false);
       }
     }, (error) => {
       console.error("Error listening to drawings:", error);
+      setError("Failed to connect to the database. Please refresh the page.");
       setLoading(false);
     });
     
@@ -82,7 +86,7 @@ function Whiteboard({ currentUser }) {
     const startDrawing = (e) => {
       if (!currentUser || !pointerEvents) {
         if (!currentUser) {
-          alert('Please sign in to draw!');
+          setError('Please sign in to draw!');
         }
         return;
       }
@@ -127,7 +131,7 @@ function Whiteboard({ currentUser }) {
       e.preventDefault();
       if (!currentUser || !pointerEvents) {
         if (!currentUser) {
-          alert('Please sign in to draw!');
+          setError('Please sign in to draw!');
         }
         return;
       }
@@ -184,7 +188,10 @@ function Whiteboard({ currentUser }) {
   }, [color, brushSize, currentUser, pointerEvents]);
 
   const clearCanvas = () => {
-    if (!currentUser) return;
+    if (!currentUser) {
+      setError('Please sign in to use the whiteboard!');
+      return;
+    }
     
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
@@ -194,7 +201,7 @@ function Whiteboard({ currentUser }) {
 
   const saveDrawing = async () => {
     if (!currentUser) {
-      alert('Please sign in to save your drawing!');
+      setError('Please sign in to save your drawing!');
       return;
     }
     
@@ -207,7 +214,8 @@ function Whiteboard({ currentUser }) {
       const drawingURL = canvas.toDataURL('image/jpeg', 0.6);
       
       // Create a unique file name
-      const fileName = `drawings/${currentUser}_${Date.now()}.jpg`;
+      const timestamp = Date.now();
+      const fileName = `drawings/${currentUser}_${timestamp}.jpg`;
       const storageRef = ref(storage, fileName);
       
       // Upload image to Firebase Storage
@@ -216,21 +224,26 @@ function Whiteboard({ currentUser }) {
       // Get download URL
       const downloadURL = await getDownloadURL(storageRef);
       
-      // Save drawing metadata to Firestore
+      // Save drawing metadata to statusUpdates collection
       const newDrawing = {
+        type: "whiteboardDrawing", // Add type field to distinguish from other statusUpdates
         imageUrl: downloadURL,
         storagePath: fileName,
         user: currentUser,
-        timestamp: Timestamp.now()
+        timestamp: Timestamp.now(),
+        // Add fields for compatibility with StatusUpdate
+        text: `${currentUser} shared a drawing`,
+        emoji: "🎨"
       };
       
-      await addDoc(collection(db, "whiteboardDrawings"), newDrawing);
+      await addDoc(collection(db, "statusUpdates"), newDrawing);
       
       // Clear the canvas
       clearCanvas();
+      setError(null);
     } catch (error) {
       console.error("Error saving drawing:", error);
-      alert("Failed to save drawing. Please try again.");
+      setError("Failed to save drawing. Please try again.");
     } finally {
       setSaving(false);
       setPointerEvents(true);
@@ -240,26 +253,42 @@ function Whiteboard({ currentUser }) {
   const deleteDrawing = async (id, storagePath, drawingUser) => {
     // Only allow deletion if current user matches the drawing creator
     if (currentUser !== drawingUser) {
-      alert("You can only delete your own drawings!");
+      setError("You can only delete your own drawings!");
       return;
     }
     
     try {
-      // First delete from Firestore
-      await deleteDoc(doc(db, "whiteboardDrawings", id));
+      // First delete from Firestore (from statusUpdates)
+      await deleteDoc(doc(db, "statusUpdates", id));
       
       // Then delete the image from Storage
       const storageRef = ref(storage, storagePath);
       await deleteObject(storageRef);
+      
+      setError(null);
     } catch (error) {
       console.error("Error deleting drawing:", error);
-      alert("Failed to delete drawing. Please try again.");
+      setError("Failed to delete drawing. Please try again.");
     }
   };
 
   return (
     <div className="container">
       <h2>Whiteboard</h2>
+      
+      {error && (
+        <div style={{
+          padding: '10px',
+          margin: '10px 0',
+          backgroundColor: '#fff0f0',
+          border: '1px solid #ffcccc',
+          borderRadius: '4px',
+          color: '#cc0000',
+          textAlign: 'center'
+        }}>
+          {error}
+        </div>
+      )}
       
       <div style={{
         textAlign: 'center', 
