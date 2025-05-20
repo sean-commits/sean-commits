@@ -1,195 +1,115 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { 
-  doc, 
-  getDoc,
-  setDoc, 
-  updateDoc, 
   collection, 
-  onSnapshot, 
+  doc, 
+  getDoc, 
+  setDoc, 
+  updateDoc,
   increment,
-  Timestamp,
-  addDoc
+  onSnapshot
 } from 'firebase/firestore';
 
 function PetInteraction({ currentUser }) {
   const [tobiDancing, setTobiDancing] = useState(false);
   const [hachiDancing, setHachiDancing] = useState(false);
-  const [petsFed, setPetsFed] = useState(0);
-  const [tobiDanceCount, setTobiDanceCount] = useState(0);
-  const [hachiDanceCount, setHachiDanceCount] = useState(0);
+  const [stats, setStats] = useState({
+    petsFed: 0,
+    tobiDances: 0,
+    hachiDances: 0,
+    lastFed: null
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [lastFed, setLastFed] = useState(null);
 
-  // Initialize Firestore documents if they don't exist
+  // Initialize and load pet stats
   useEffect(() => {
-    const initializePetStats = async () => {
+    // Create a single stats document if it doesn't exist
+    const initStats = async () => {
       try {
-        // Check if documents exist and create if they don't
-        const feedDocRef = doc(db, "petStats", "feedCount");
-        const feedDocSnap = await getDoc(feedDocRef);
+        const statsRef = doc(db, "pets", "stats");
+        const statsDoc = await getDoc(statsRef);
         
-        if (!feedDocSnap.exists()) {
-          console.log("Creating feedCount document");
-          await setDoc(feedDocRef, { 
-            count: 0,
+        if (!statsDoc.exists()) {
+          await setDoc(statsRef, {
+            petsFed: 0,
+            tobiDances: 0,
+            hachiDances: 0,
             lastFed: null
           });
         }
-        
-        const tobiDocRef = doc(db, "petStats", "tobiDanceCount");
-        const tobiDocSnap = await getDoc(tobiDocRef);
-        
-        if (!tobiDocSnap.exists()) {
-          console.log("Creating tobiDanceCount document");
-          await setDoc(tobiDocRef, { count: 0 });
-        }
-        
-        const hachiDocRef = doc(db, "petStats", "hachiDanceCount");
-        const hachiDocSnap = await getDoc(hachiDocRef);
-        
-        if (!hachiDocSnap.exists()) {
-          console.log("Creating hachiDanceCount document");
-          await setDoc(hachiDocRef, { count: 0 });
-        }
-      } catch (error) {
-        console.error("Error initializing pet stats:", error);
+      } catch (err) {
+        console.error("Error initializing stats:", err);
       }
     };
     
-    // Call the initialization function
-    initializePetStats();
-  }, []);
-
-  // Load pet stats from Firestore
-  useEffect(() => {
-    // Set up real-time listener for petStats collection
-    const unsubscribe = onSnapshot(collection(db, "petStats"), (snapshot) => {
-      try {
-        let fedCount = 0;
-        let tobiCount = 0;
-        let hachiCount = 0;
-        let lastFedTime = null;
-        
-        snapshot.forEach((doc) => {
-          const data = doc.data();
-          
-          if (doc.id === 'feedCount') {
-            fedCount = data.count || 0;
-            lastFedTime = data.lastFed ? new Date(data.lastFed.seconds * 1000) : null;
-          } else if (doc.id === 'tobiDanceCount') {
-            tobiCount = data.count || 0;
-          } else if (doc.id === 'hachiDanceCount') {
-            hachiCount = data.count || 0;
-          }
-        });
-        
-        setPetsFed(fedCount);
-        setTobiDanceCount(tobiCount);
-        setHachiDanceCount(hachiCount);
-        setLastFed(lastFedTime);
-        setLoading(false);
-      } catch (error) {
-        console.error("Error processing pet stats:", error);
-        setError("Failed to load pet data. Please refresh the page.");
-        setLoading(false);
+    initStats();
+    
+    // Set up listener for the stats document
+    const statsRef = doc(db, "pets", "stats");
+    const unsubscribe = onSnapshot(statsRef, (doc) => {
+      if (doc.exists()) {
+        setStats(doc.data());
       }
-    }, (error) => {
-      console.error("Error listening to pet stats:", error);
-      setError("Failed to connect to the database. Please refresh the page.");
+      setLoading(false);
+    }, (err) => {
+      console.error("Error in snapshot:", err);
+      setError("Failed to load pet data");
       setLoading(false);
     });
     
-    // Clean up listener on component unmount
     return () => unsubscribe();
   }, []);
 
-  const handleTobiClick = async () => {
+  const handleTobiDance = async () => {
+    if (!currentUser) return;
+    
     setTobiDancing(true);
     setTimeout(() => setTobiDancing(false), 3000);
     
     try {
-      if (currentUser) {
-        // Update Tobi's dance count in Firestore
-        const tobiDocRef = doc(db, "petStats", "tobiDanceCount");
-        await updateDoc(tobiDocRef, {
-          count: increment(1),
-          lastInteraction: Timestamp.now(),
-          lastUser: currentUser
-        });
-        
-        // Add interaction log entry
-        await addDoc(collection(db, "petInteractions"), {
-          type: "dance",
-          pet: "Tobi",
-          user: currentUser,
-          timestamp: Timestamp.now()
-        });
-      }
-    } catch (error) {
-      console.error("Error updating Tobi dance count:", error);
-      setError("Failed to record interaction. Please try again.");
+      const statsRef = doc(db, "pets", "stats");
+      await updateDoc(statsRef, {
+        tobiDances: increment(1)
+      });
+    } catch (err) {
+      console.error("Error updating Tobi dance count:", err);
     }
   };
 
-  const handleHachiClick = async () => {
+  const handleHachiDance = async () => {
+    if (!currentUser) return;
+    
     setHachiDancing(true);
     setTimeout(() => setHachiDancing(false), 3000);
     
     try {
-      if (currentUser) {
-        // Update Hachi's dance count in Firestore
-        const hachiDocRef = doc(db, "petStats", "hachiDanceCount");
-        await updateDoc(hachiDocRef, {
-          count: increment(1),
-          lastInteraction: Timestamp.now(),
-          lastUser: currentUser
-        });
-        
-        // Add interaction log entry
-        await addDoc(collection(db, "petInteractions"), {
-          type: "dance",
-          pet: "Hachi",
-          user: currentUser,
-          timestamp: Timestamp.now()
-        });
-      }
-    } catch (error) {
-      console.error("Error updating Hachi dance count:", error);
-      setError("Failed to record interaction. Please try again.");
+      const statsRef = doc(db, "pets", "stats");
+      await updateDoc(statsRef, {
+        hachiDances: increment(1)
+      });
+    } catch (err) {
+      console.error("Error updating Hachi dance count:", err);
     }
   };
 
   const feedPets = async () => {
+    if (!currentUser) return;
+    
     try {
-      if (currentUser) {
-        // Update feed count in Firestore
-        const feedDocRef = doc(db, "petStats", "feedCount");
-        await updateDoc(feedDocRef, {
-          count: increment(1),
-          lastFed: Timestamp.now(),
-          lastUser: currentUser
-        });
-        
-        // Add interaction log entry
-        await addDoc(collection(db, "petInteractions"), {
-          type: "feed",
-          user: currentUser,
-          timestamp: Timestamp.now()
-        });
-      } else {
-        setError("Please sign in to feed pets!");
-      }
-    } catch (error) {
-      console.error("Error updating feed count:", error);
-      setError("Failed to record feeding. Please try again.");
+      const statsRef = doc(db, "pets", "stats");
+      await updateDoc(statsRef, {
+        petsFed: increment(1),
+        lastFed: new Date().toISOString()
+      });
+    } catch (err) {
+      console.error("Error feeding pets:", err);
     }
   };
 
-  const formatDate = (date) => {
-    if (!date) return "Never";
-    return date.toLocaleString();
+  const formatDate = (dateStr) => {
+    if (!dateStr) return "Never";
+    return new Date(dateStr).toLocaleString();
   };
 
   return (
@@ -218,7 +138,7 @@ function PetInteraction({ currentUser }) {
             <img
               src="/path/to/tobi.jpg" // Replace with actual image path
               alt="Tobi"
-              onClick={handleTobiClick}
+              onClick={handleTobiDance}
               className={tobiDancing ? 'dancing' : ''}
               style={{
                 width: '150px',
@@ -231,18 +151,16 @@ function PetInteraction({ currentUser }) {
               }}
             />
             <p style={{fontWeight: 'bold', marginTop: '5px'}}>Tobi</p>
-            {!loading && (
-              <p style={{fontSize: '14px', color: '#666'}}>
-                Dance Count: {tobiDanceCount}
-              </p>
-            )}
+            <p style={{fontSize: '14px', color: '#666'}}>
+              Dance Count: {loading ? '...' : stats.tobiDances}
+            </p>
           </div>
           
           <div>
             <img
               src="/path/to/hachi.jpg" // Replace with actual image path
               alt="Hachi"
-              onClick={handleHachiClick}
+              onClick={handleHachiDance}
               className={hachiDancing ? 'dancing' : ''}
               style={{
                 width: '150px',
@@ -255,11 +173,9 @@ function PetInteraction({ currentUser }) {
               }}
             />
             <p style={{fontWeight: 'bold', marginTop: '5px'}}>Hachi</p>
-            {!loading && (
-              <p style={{fontSize: '14px', color: '#666'}}>
-                Dance Count: {hachiDanceCount}
-              </p>
-            )}
+            <p style={{fontSize: '14px', color: '#666'}}>
+              Dance Count: {loading ? '...' : stats.hachiDances}
+            </p>
           </div>
         </div>
         
@@ -288,18 +204,14 @@ function PetInteraction({ currentUser }) {
             Feed Pets
           </button>
           
-          {loading ? (
-            <p>Loading pet data...</p>
-          ) : (
-            <div style={{marginTop: '15px'}}>
-              <p style={{margin: '5px 0'}}>
-                Pets have been fed <strong>{petsFed}</strong> {petsFed === 1 ? 'time' : 'times'}!
-              </p>
-              <p style={{margin: '5px 0', fontSize: '14px', color: '#666'}}>
-                Last fed: {formatDate(lastFed)}
-              </p>
-            </div>
-          )}
+          <div style={{marginTop: '15px'}}>
+            <p style={{margin: '5px 0'}}>
+              Pets have been fed <strong>{loading ? '...' : stats.petsFed}</strong> {stats.petsFed === 1 ? 'time' : 'times'}!
+            </p>
+            <p style={{margin: '5px 0', fontSize: '14px', color: '#666'}}>
+              Last fed: {loading ? '...' : formatDate(stats.lastFed)}
+            </p>
+          </div>
         </div>
       </div>
       
