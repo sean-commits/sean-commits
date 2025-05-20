@@ -10,8 +10,7 @@ import {
   query, 
   Timestamp, 
   onSnapshot, 
-  getDoc,
-  orderBy
+  getDoc
 } from 'firebase/firestore';
 
 function CalendarComponent({ currentUser }) {
@@ -35,9 +34,8 @@ function CalendarComponent({ currentUser }) {
     }
 
     setLoading(true);
-    // Create a query with orderBy to ensure consistent order
     const eventsRef = collection(db, "calendarEvents");
-    const q = query(eventsRef, orderBy("timestamp", "desc"));
+    const q = query(eventsRef);
     
     // Set up real-time listener
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
@@ -46,7 +44,6 @@ function CalendarComponent({ currentUser }) {
         
         querySnapshot.forEach(doc => {
           const data = doc.data();
-          // Ensure we're using a consistent date format
           const dateKey = data.date;
           
           if (!eventsData[dateKey]) {
@@ -57,12 +54,19 @@ function CalendarComponent({ currentUser }) {
             id: doc.id,
             text: data.text,
             user: data.user,
-            timestamp: data.timestamp.toDate()
+            timestamp: data.timestamp?.toDate ? data.timestamp.toDate() : new Date()
           });
         });
         
+        // Sort events for each date by timestamp
+        Object.keys(eventsData).forEach(dateKey => {
+          eventsData[dateKey].sort((a, b) => b.timestamp - a.timestamp);
+        });
+        
+        console.log("Loaded events data:", eventsData);
         setEvents(eventsData);
         setLoading(false);
+        setError(null);
       } catch (error) {
         console.error("Error processing calendar events:", error);
         setError("Failed to load events. Please refresh the page.");
@@ -121,6 +125,8 @@ function CalendarComponent({ currentUser }) {
 
   const deleteEvent = async (eventId) => {
     try {
+      setError(null);
+      
       // Get the event to check ownership
       const eventRef = doc(db, "calendarEvents", eventId);
       const eventSnap = await getDoc(eventRef);
@@ -139,6 +145,9 @@ function CalendarComponent({ currentUser }) {
         // Delete from Firestore
         await deleteDoc(eventRef);
         console.log("Event successfully deleted");
+      } else {
+        console.error("Event not found:", eventId);
+        setError("Event not found. It may have been deleted already.");
       }
     } catch (error) {
       console.error("Error deleting event:", error);
