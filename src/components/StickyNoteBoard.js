@@ -26,10 +26,12 @@ function StickyNoteBoard({ currentUser }) {
     { value: '#ffcc99', label: 'Orange' }
   ];
 
-  // Load notes from Firestore on component mount
+  // Load notes from Firestore on component mount - use statusUpdates collection
   useEffect(() => {
+    // Filter for only sticky note type documents
     const q = query(
-      collection(db, "stickyNotes"), 
+      collection(db, "statusUpdates"), 
+      where("type", "==", "stickyNote"),
       orderBy("timestamp", "desc")
     );
     
@@ -64,13 +66,15 @@ function StickyNoteBoard({ currentUser }) {
           text: newNote,
           color: noteColor,
           user: currentUser,
-          timestamp: Timestamp.now()
+          timestamp: Timestamp.now(),
+          type: "stickyNote", // Add type field to differentiate from other statusUpdates
+          emoji: "📝" // Add emoji for compatibility with StatusUpdate component
         };
         
-        // Add to Firestore
-        await addDoc(collection(db, "stickyNotes"), newNoteData);
+        // Add to statusUpdates collection instead
+        await addDoc(collection(db, "statusUpdates"), newNoteData);
         
-        // Clear input field (no need to manually update state as the listener will handle it)
+        // Clear input field
         setNewNote('');
       } catch (error) {
         console.error("Error adding sticky note:", error);
@@ -91,9 +95,8 @@ function StickyNoteBoard({ currentUser }) {
     }
     
     try {
-      // Delete from Firestore
-      await deleteDoc(doc(db, "stickyNotes", id));
-      // No need to manually update state as the listener will handle it
+      // Delete from statusUpdates collection
+      await deleteDoc(doc(db, "statusUpdates", id));
     } catch (error) {
       console.error("Error deleting note:", error);
       alert("Failed to delete note. Please try again.");
