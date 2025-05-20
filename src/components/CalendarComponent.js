@@ -1,307 +1,187 @@
-import React, { useState, useEffect } from 'react';
-import Calendar from 'react-calendar';
-import 'react-calendar/dist/Calendar.css';
+import React, { useState } from 'react';
 import { db } from '../firebase';
-import { 
-  collection, 
-  addDoc, 
-  deleteDoc, 
-  doc, 
-  onSnapshot 
-} from 'firebase/firestore';
+import { collection, addDoc } from 'firebase/firestore';
 
-function CalendarComponent({ currentUser }) {
-  const [date, setDate] = useState(new Date());
+function SimpleCalendar({ currentUser }) {
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [eventText, setEventText] = useState('');
   const [events, setEvents] = useState([]);
-  const [newEvent, setNewEvent] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [status, setStatus] = useState('');
 
-  // Format date consistently for display and storage
-  const formatDate = (date) => {
-    const d = new Date(date);
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const handleDateChange = (e) => {
+    setSelectedDate(e.target.value);
   };
 
-  // Load all events from Firestore
-  useEffect(() => {
-    const eventsCollection = collection(db, "events");
-    const unsubscribe = onSnapshot(eventsCollection, (snapshot) => {
-      try {
-        const allEvents = [];
-        snapshot.forEach((doc) => {
-          allEvents.push({
-            id: doc.id,
-            ...doc.data()
-          });
-        });
-        
-        setEvents(allEvents);
-        setLoading(false);
-      } catch (err) {
-        console.error("Error loading events:", err);
-        setError("Failed to load events");
-        setLoading(false);
-      }
-    }, (err) => {
-      console.error("Snapshot error:", err);
-      setError("Failed to connect to database");
-      setLoading(false);
-    });
+  const addEvent = () => {
+    if (!currentUser) {
+      setStatus('Please login first!');
+      return;
+    }
     
-    return () => unsubscribe();
-  }, []);
+    if (!eventText.trim()) {
+      setStatus('Please enter event text!');
+      return;
+    }
+    
+    // Add to local state
+    const newEvent = {
+      id: Date.now(),
+      date: selectedDate,
+      text: eventText,
+      user: currentUser
+    };
+    
+    setEvents([...events, newEvent]);
+    setEventText('');
+    setStatus('Event added!');
+    
+    // Try to write to Firebase
+    try {
+      addDoc(collection(db, "events"), {
+        date: selectedDate,
+        text: eventText,
+        user: currentUser,
+        timestamp: new Date().toString()
+      });
+    } catch (error) {
+      console.error("Firebase write error:", error);
+    }
+  };
+
+  const removeEvent = (id) => {
+    setEvents(events.filter(event => event.id !== id));
+    setStatus('Event removed!');
+  };
 
   // Filter events for the selected date
-  const getEventsForDate = (dateStr) => {
-    return events.filter(event => event.date === dateStr);
-  };
-
-  const handleDateChange = (newDate) => {
-    setDate(newDate);
-  };
-
-  const addEvent = async () => {
-    if (!currentUser) {
-      setError('Please sign in to add events!');
-      return;
-    }
-    
-    if (!newEvent.trim()) {
-      setError('Please enter an event description!');
-      return;
-    }
-
-    try {
-      const dateStr = formatDate(date);
-      
-      await addDoc(collection(db, "events"), {
-        date: dateStr,
-        text: newEvent.trim(),
-        user: currentUser,
-        created: new Date().toISOString()
-      });
-      
-      setNewEvent('');
-      setError(null);
-    } catch (err) {
-      console.error("Error adding event:", err);
-      setError("Failed to add event");
-    }
-  };
-
-  const deleteEvent = async (eventId) => {
-    if (!currentUser) {
-      setError('Please sign in to delete events!');
-      return;
-    }
-    
-    try {
-      await deleteDoc(doc(db, "events", eventId));
-      setError(null);
-    } catch (err) {
-      console.error("Error deleting event:", err);
-      setError("Failed to delete event");
-    }
-  };
-
-  const handleKeyPress = (e) => {
-    if (e.key === 'Enter' && currentUser && newEvent.trim()) {
-      addEvent();
-    }
-  };
-
-  // Check if a date has events (for calendar tile styling)
-  const tileClassName = ({ date, view }) => {
-    if (view === 'month') {
-      const dateStr = formatDate(date);
-      const hasEvents = events.some(event => event.date === dateStr);
-      return hasEvents ? 'has-events' : null;
-    }
-  };
-
-  // Apply calendar styles
-  useEffect(() => {
-    const style = document.createElement('style');
-    style.innerHTML = `
-      .react-calendar {
-        width: 100%;
-        background-color: #ffccff;
-        border: 3px solid #9933cc;
-        font-family: 'Comic Sans MS', sans-serif;
-        border-radius: 8px;
-        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-      }
-      .react-calendar__tile--active {
-        background: #ff9900 !important;
-        color: white !important;
-      }
-      .react-calendar__tile:enabled:hover {
-        background-color: #ffcc00;
-      }
-      .has-events {
-        background-color: #ffcc99;
-        font-weight: bold;
-        position: relative;
-      }
-      .has-events::after {
-        content: '•';
-        position: absolute;
-        bottom: 3px;
-        right: 3px;
-        font-size: 18px;
-        color: #ff3366;
-      }
-    `;
-    document.head.appendChild(style);
-    return () => {
-      document.head.removeChild(style);
-    };
-  }, []);
-
-  // Get events for the selected date
-  const currentDateEvents = getEventsForDate(formatDate(date));
+  const filteredEvents = events.filter(event => event.date === selectedDate);
 
   return (
-    <div className="container">
-      <h2>Times we have done the deed</h2>
+    <div className="container" style={{padding: '20px'}}>
+      <h2>Simple Calendar</h2>
       
-      {error && (
+      {status && (
         <div style={{
           padding: '10px',
           margin: '10px 0',
-          backgroundColor: '#fff0f0',
-          border: '1px solid #ffcccc',
-          borderRadius: '4px',
-          color: '#cc0000',
-          textAlign: 'center'
+          backgroundColor: '#f0f8ff',
+          borderRadius: '5px'
         }}>
-          {error}
+          {status}
         </div>
       )}
       
-      <div style={{display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
-        {loading ? (
-          <div style={{textAlign: 'center', padding: '20px'}}>
-            <p>Loading calendar events...</p>
-          </div>
-        ) : (
-          <Calendar 
-            onChange={handleDateChange} 
-            value={date} 
-            tileClassName={tileClassName}
-          />
-        )}
-        
-        <div style={{
-          marginTop: '20px', 
-          width: '100%', 
-          textAlign: 'center',
-          padding: '15px',
-          backgroundColor: '#f9f9f9',
-          borderRadius: '8px',
-          border: '2px solid #ff9900'
-        }}>
-          <h3 style={{
-            backgroundColor: '#ffcc99', 
-            padding: '8px',
-            borderRadius: '5px'
-          }}>
-            Selected Date: {date.toDateString()}
-          </h3>
-          
-          <div style={{margin: '15px 0'}}>
-            <input
-              type="text"
-              value={newEvent}
-              onChange={(e) => setNewEvent(e.target.value)}
-              onKeyPress={handleKeyPress}
-              placeholder={currentUser ? "Add event for this date" : "Sign in to add events"}
-              style={{
-                width: '60%',
-                padding: '8px',
-                borderRadius: '4px',
-                border: '1px solid #ccc'
-              }}
-              disabled={!currentUser}
-            />
-            <button 
-              onClick={addEvent} 
-              style={{
-                marginLeft: '10px',
-                padding: '8px 16px',
-                backgroundColor: !currentUser || !newEvent.trim() ? '#cccccc' : '#ff9900',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: !currentUser || !newEvent.trim() ? 'not-allowed' : 'pointer'
-              }}
-              disabled={!currentUser || !newEvent.trim()}
-            >
-              Add
-            </button>
-          </div>
-          
-          <div style={{marginTop: '15px'}}>
-            <h4 style={{
-              backgroundColor: '#ffccff', 
+      <div style={{
+        border: '2px solid #3399ff',
+        padding: '15px',
+        borderRadius: '8px',
+        marginBottom: '20px'
+      }}>
+        <div style={{marginBottom: '15px'}}>
+          <label style={{display: 'block', marginBottom: '5px'}}>
+            Select Date:
+          </label>
+          <input 
+            type="date" 
+            value={selectedDate}
+            onChange={handleDateChange}
+            style={{
               padding: '8px',
               borderRadius: '4px',
-              color: '#9933cc'
-            }}>
-              Events on this date:
-            </h4>
-            {loading ? (
-              <p>Loading events...</p>
-            ) : currentDateEvents.length > 0 ? (
-              <ul style={{
-                listStyleType: 'none', 
-                padding: 0,
-                maxHeight: '250px',
-                overflowY: 'auto'
+              border: '1px solid #ccc',
+              width: '100%'
+            }}
+          />
+        </div>
+        
+        <div style={{marginBottom: '15px'}}>
+          <label style={{display: 'block', marginBottom: '5px'}}>
+            Event:
+          </label>
+          <input 
+            type="text"
+            value={eventText}
+            onChange={(e) => setEventText(e.target.value)}
+            placeholder={currentUser ? "Enter event details" : "Login to add events"}
+            style={{
+              padding: '8px',
+              borderRadius: '4px',
+              border: '1px solid #ccc',
+              width: '100%'
+            }}
+            disabled={!currentUser}
+          />
+        </div>
+        
+        <button 
+          onClick={addEvent}
+          disabled={!currentUser || !eventText.trim()}
+          style={{
+            padding: '8px 16px',
+            backgroundColor: !currentUser || !eventText.trim() ? '#cccccc' : '#4CAF50',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: !currentUser || !eventText.trim() ? 'not-allowed' : 'pointer'
+          }}
+        >
+          Add Event
+        </button>
+      </div>
+      
+      <div>
+        <h3>Events for {selectedDate}</h3>
+        
+        {filteredEvents.length === 0 ? (
+          <p>No events for this date.</p>
+        ) : (
+          <ul style={{
+            listStyleType: 'none',
+            padding: 0
+          }}>
+            {filteredEvents.map(event => (
+              <li key={event.id} style={{
+                padding: '10px',
+                backgroundColor: '#f9f9f9',
+                borderRadius: '4px',
+                marginBottom: '10px',
+                position: 'relative'
               }}>
-                {currentDateEvents.map((event) => (
-                  <li key={event.id} style={{
-                    margin: '8px 0',
-                    padding: '10px',
-                    backgroundColor: '#ffffff',
-                    border: '1px solid #cccccc',
-                    borderRadius: '4px',
-                    position: 'relative',
-                    boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
-                    transition: 'transform 0.2s ease, box-shadow 0.2s ease',
-                    textAlign: 'left'
+                <div>{event.text}</div>
+                <div style={{fontSize: '12px', color: '#666'}}>Added by: {event.user}</div>
+                
+                <button 
+                  onClick={() => removeEvent(event.id)}
+                  style={{
+                    position: 'absolute',
+                    top: '5px',
+                    right: '5px',
+                    backgroundColor: '#ff6666',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '50%',
+                    width: '20px',
+                    height: '20px',
+                    fontSize: '12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer'
                   }}
-                  onMouseOver={(e) => {
-                    e.currentTarget.style.transform = 'translateY(-2px)';
-                    e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.1)';
-                  }}
-                  onMouseOut={(e) => {
-                    e.currentTarget.style.transform = 'translateY(0)';
-                    e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.05)';
-                  }}
-                  >
-                    <div>{event.text}</div>
-                    <div style={{
-                      fontSize: '12px',
-                      color: '#666',
-                      marginTop: '5px'
-                    }}>
-                      Added by: {event.user}
-                    </div>
-                    
-                    {currentUser === event.user && (
-                      <button 
-                        onClick={() => deleteEvent(event.id)}
-                        style={{
-                          position: 'absolute',
-                          top: '8px',
-                          right: '8px',
-                          backgroundColor: '#ff6666',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '50%',
-                          width: '20px',
-                          height: '20px',
-                          fontSize: '12px',
-                          cursor: 'pointer',
+                >
+                  ✕
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        
+        <p style={{fontSize: '12px', color: '#666'}}>
+          (Firebase writes are being attempted but data is not loaded from Firebase)
+        </p>
+      </div>
+    </div>
+  );
+}
+
+export default SimpleCalendar;
