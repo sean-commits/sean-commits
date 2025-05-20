@@ -10,8 +10,8 @@ import {
   query, 
   Timestamp, 
   onSnapshot, 
-  where,
-  getDocs
+  getDoc,
+  orderBy
 } from 'firebase/firestore';
 
 function CalendarComponent({ currentUser }) {
@@ -20,6 +20,11 @@ function CalendarComponent({ currentUser }) {
   const [newEvent, setNewEvent] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Format date consistently for Firestore storage and retrieval
+  const formatDate = (date) => {
+    return date.toISOString().split('T')[0];
+  };
 
   // Load events from Firestore
   useEffect(() => {
@@ -30,15 +35,18 @@ function CalendarComponent({ currentUser }) {
     }
 
     setLoading(true);
-    const q = query(collection(db, "calendarEvents"));
+    // Create a query with orderBy to ensure consistent order
+    const eventsRef = collection(db, "calendarEvents");
+    const q = query(eventsRef, orderBy("timestamp", "desc"));
     
     // Set up real-time listener
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
       try {
         const eventsData = {};
         
-        querySnapshot.docs.forEach(doc => {
+        querySnapshot.forEach(doc => {
           const data = doc.data();
+          // Ensure we're using a consistent date format
           const dateKey = data.date;
           
           if (!eventsData[dateKey]) {
@@ -51,11 +59,6 @@ function CalendarComponent({ currentUser }) {
             user: data.user,
             timestamp: data.timestamp.toDate()
           });
-        });
-        
-        // Sort events for each date by timestamp
-        Object.keys(eventsData).forEach(dateKey => {
-          eventsData[dateKey].sort((a, b) => b.timestamp - a.timestamp);
         });
         
         setEvents(eventsData);
@@ -79,10 +82,6 @@ function CalendarComponent({ currentUser }) {
     setDate(newDate);
   };
 
-  const formatDate = (date) => {
-    return date.toISOString().split('T')[0];
-  };
-
   const addEvent = async () => {
     if (!currentUser) {
       setError('Please sign in to add events!');
@@ -98,13 +97,19 @@ function CalendarComponent({ currentUser }) {
       setError(null);
       const dateStr = formatDate(date);
       
-      // Add to Firestore
-      await addDoc(collection(db, "calendarEvents"), {
+      // Create the event object
+      const eventData = {
         date: dateStr,
         text: newEvent.trim(),
         user: currentUser,
         timestamp: Timestamp.now()
-      });
+      };
+      
+      console.log("Adding event to Firestore:", eventData);
+      
+      // Add to Firestore
+      const docRef = await addDoc(collection(db, "calendarEvents"), eventData);
+      console.log("Document written with ID: ", docRef.id);
       
       // Clear input field
       setNewEvent('');
@@ -117,13 +122,11 @@ function CalendarComponent({ currentUser }) {
   const deleteEvent = async (eventId) => {
     try {
       // Get the event to check ownership
-      const eventDoc = await getDocs(query(
-        collection(db, "calendarEvents"), 
-        where("__name__", "==", eventId)
-      ));
+      const eventRef = doc(db, "calendarEvents", eventId);
+      const eventSnap = await getDoc(eventRef);
       
-      if (!eventDoc.empty) {
-        const eventData = eventDoc.docs[0].data();
+      if (eventSnap.exists()) {
+        const eventData = eventSnap.data();
         
         // Only allow deletion if current user matches the event creator
         if (currentUser !== eventData.user) {
@@ -131,8 +134,11 @@ function CalendarComponent({ currentUser }) {
           return;
         }
         
+        console.log("Deleting event with ID:", eventId);
+        
         // Delete from Firestore
-        await deleteDoc(doc(db, "calendarEvents", eventId));
+        await deleteDoc(eventRef);
+        console.log("Event successfully deleted");
       }
     } catch (error) {
       console.error("Error deleting event:", error);
