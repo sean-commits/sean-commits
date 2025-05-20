@@ -2,13 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { 
   doc, 
+  getDoc,
   setDoc, 
   updateDoc, 
   collection, 
   onSnapshot, 
   increment,
-  serverTimestamp,
-  getDoc
+  Timestamp,
+  addDoc
 } from 'firebase/firestore';
 
 function PetInteraction({ currentUser }) {
@@ -23,15 +24,9 @@ function PetInteraction({ currentUser }) {
 
   // Initialize Firestore documents if they don't exist
   useEffect(() => {
-    if (!db) {
-      setError("Database connection failed. Please refresh the page.");
-      setLoading(false);
-      return;
-    }
-
     const initializePetStats = async () => {
       try {
-        // Check if feed count document exists and create if it doesn't
+        // Check if documents exist and create if they don't
         const feedDocRef = doc(db, "petStats", "feedCount");
         const feedDocSnap = await getDoc(feedDocRef);
         
@@ -43,7 +38,6 @@ function PetInteraction({ currentUser }) {
           });
         }
         
-        // Check if Tobi's dance count document exists and create if it doesn't
         const tobiDocRef = doc(db, "petStats", "tobiDanceCount");
         const tobiDocSnap = await getDoc(tobiDocRef);
         
@@ -52,7 +46,6 @@ function PetInteraction({ currentUser }) {
           await setDoc(tobiDocRef, { count: 0 });
         }
         
-        // Check if Hachi's dance count document exists and create if it doesn't
         const hachiDocRef = doc(db, "petStats", "hachiDanceCount");
         const hachiDocSnap = await getDoc(hachiDocRef);
         
@@ -62,38 +55,29 @@ function PetInteraction({ currentUser }) {
         }
       } catch (error) {
         console.error("Error initializing pet stats:", error);
-        setError("Failed to initialize pet data.");
       }
     };
     
+    // Call the initialization function
     initializePetStats();
-  }, [db]);
+  }, []);
 
-  // Load pet interaction data from Firestore
+  // Load pet stats from Firestore
   useEffect(() => {
-    if (!db) {
-      return;
-    }
-
-    setLoading(true);
-    
-    // Set up real-time listener for pet stats
-    const petsStatsRef = collection(db, "petStats");
-    const unsubscribe = onSnapshot(petsStatsRef, (snapshot) => {
+    // Set up real-time listener for petStats collection
+    const unsubscribe = onSnapshot(collection(db, "petStats"), (snapshot) => {
       try {
-        console.log("Received pet stats update");
         let fedCount = 0;
         let tobiCount = 0;
         let hachiCount = 0;
-        let lastFedTimestamp = null;
+        let lastFedTime = null;
         
         snapshot.forEach((doc) => {
           const data = doc.data();
-          console.log(`Document ${doc.id}:`, data);
           
           if (doc.id === 'feedCount') {
             fedCount = data.count || 0;
-            lastFedTimestamp = data.lastFed ? data.lastFed.toDate() : null;
+            lastFedTime = data.lastFed ? new Date(data.lastFed.seconds * 1000) : null;
           } else if (doc.id === 'tobiDanceCount') {
             tobiCount = data.count || 0;
           } else if (doc.id === 'hachiDanceCount') {
@@ -101,22 +85,14 @@ function PetInteraction({ currentUser }) {
           }
         });
         
-        console.log("Setting pet stats:", {
-          fedCount,
-          tobiCount,
-          hachiCount,
-          lastFedTimestamp
-        });
-        
         setPetsFed(fedCount);
         setTobiDanceCount(tobiCount);
         setHachiDanceCount(hachiCount);
-        setLastFed(lastFedTimestamp);
+        setLastFed(lastFedTime);
         setLoading(false);
-        setError(null);
       } catch (error) {
         console.error("Error processing pet stats:", error);
-        setError("Failed to load pet interaction data. Please refresh the page.");
+        setError("Failed to load pet data. Please refresh the page.");
         setLoading(false);
       }
     }, (error) => {
@@ -127,7 +103,7 @@ function PetInteraction({ currentUser }) {
     
     // Clean up listener on component unmount
     return () => unsubscribe();
-  }, [db]);
+  }, []);
 
   const handleTobiClick = async () => {
     setTobiDancing(true);
@@ -135,30 +111,21 @@ function PetInteraction({ currentUser }) {
     
     try {
       if (currentUser) {
-        setError(null);
-        
         // Update Tobi's dance count in Firestore
-        console.log("Updating Tobi dance count");
         const tobiDocRef = doc(db, "petStats", "tobiDanceCount");
         await updateDoc(tobiDocRef, {
           count: increment(1),
-          lastInteraction: serverTimestamp(),
+          lastInteraction: Timestamp.now(),
           lastUser: currentUser
         });
-        console.log("Tobi dance count updated");
         
-        // Add to interaction log
-        console.log("Adding to interaction log");
-        const interactionRef = doc(collection(db, "petInteractions"));
-        await setDoc(interactionRef, {
+        // Add interaction log entry
+        await addDoc(collection(db, "petInteractions"), {
           type: "dance",
           pet: "Tobi",
           user: currentUser,
-          timestamp: serverTimestamp()
+          timestamp: Timestamp.now()
         });
-        console.log("Interaction log updated");
-      } else {
-        setError("Please sign in to save interactions!");
       }
     } catch (error) {
       console.error("Error updating Tobi dance count:", error);
@@ -172,30 +139,21 @@ function PetInteraction({ currentUser }) {
     
     try {
       if (currentUser) {
-        setError(null);
-        
         // Update Hachi's dance count in Firestore
-        console.log("Updating Hachi dance count");
         const hachiDocRef = doc(db, "petStats", "hachiDanceCount");
         await updateDoc(hachiDocRef, {
           count: increment(1),
-          lastInteraction: serverTimestamp(),
+          lastInteraction: Timestamp.now(),
           lastUser: currentUser
         });
-        console.log("Hachi dance count updated");
         
-        // Add to interaction log
-        console.log("Adding to interaction log");
-        const interactionRef = doc(collection(db, "petInteractions"));
-        await setDoc(interactionRef, {
+        // Add interaction log entry
+        await addDoc(collection(db, "petInteractions"), {
           type: "dance",
           pet: "Hachi",
           user: currentUser,
-          timestamp: serverTimestamp()
+          timestamp: Timestamp.now()
         });
-        console.log("Interaction log updated");
-      } else {
-        setError("Please sign in to save interactions!");
       }
     } catch (error) {
       console.error("Error updating Hachi dance count:", error);
@@ -206,27 +164,20 @@ function PetInteraction({ currentUser }) {
   const feedPets = async () => {
     try {
       if (currentUser) {
-        setError(null);
-        
         // Update feed count in Firestore
-        console.log("Updating feed count");
         const feedDocRef = doc(db, "petStats", "feedCount");
         await updateDoc(feedDocRef, {
           count: increment(1),
-          lastFed: serverTimestamp(),
+          lastFed: Timestamp.now(),
           lastUser: currentUser
         });
-        console.log("Feed count updated");
         
-        // Add to interaction log
-        console.log("Adding to interaction log");
-        const interactionRef = doc(collection(db, "petInteractions"));
-        await setDoc(interactionRef, {
+        // Add interaction log entry
+        await addDoc(collection(db, "petInteractions"), {
           type: "feed",
           user: currentUser,
-          timestamp: serverTimestamp()
+          timestamp: Timestamp.now()
         });
-        console.log("Interaction log updated");
       } else {
         setError("Please sign in to feed pets!");
       }
@@ -265,7 +216,7 @@ function PetInteraction({ currentUser }) {
         <div style={{display: 'flex', justifyContent: 'center', gap: '30px', margin: '20px 0'}}>
           <div>
             <img
-              src="/Users/seanmorris/Desktop/sean-commits/src/IMG_0076.JPG" // Replace with actual image path
+              src="/path/to/tobi.jpg" // Replace with actual image path
               alt="Tobi"
               onClick={handleTobiClick}
               className={tobiDancing ? 'dancing' : ''}
@@ -289,7 +240,7 @@ function PetInteraction({ currentUser }) {
           
           <div>
             <img
-              src="/Users/seanmorris/Desktop/sean-commits/src/A5FA0E8A-3ABD-44E4-8F28-4A51B484DB8A.JPG" // Replace with actual image path
+              src="/path/to/hachi.jpg" // Replace with actual image path
               alt="Hachi"
               onClick={handleHachiClick}
               className={hachiDancing ? 'dancing' : ''}

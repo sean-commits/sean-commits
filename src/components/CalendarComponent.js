@@ -9,8 +9,7 @@ import {
   doc, 
   query, 
   Timestamp, 
-  onSnapshot, 
-  getDoc
+  onSnapshot 
 } from 'firebase/firestore';
 
 function CalendarComponent({ currentUser }) {
@@ -20,63 +19,56 @@ function CalendarComponent({ currentUser }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Format date consistently for Firestore storage and retrieval
+  // Format date consistently
   const formatDate = (date) => {
-    return date.toISOString().split('T')[0];
+    const d = new Date(date);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   };
 
   // Load events from Firestore
   useEffect(() => {
-    if (!db) {
-      setError("Database connection failed. Please refresh the page.");
-      setLoading(false);
-      return;
-    }
-
-    setLoading(true);
-    const eventsRef = collection(db, "calendarEvents");
-    const q = query(eventsRef);
-    
-    // Set up real-time listener
-    const unsubscribe = onSnapshot(q, (querySnapshot) => {
-      try {
-        const eventsData = {};
-        
-        querySnapshot.forEach(doc => {
-          const data = doc.data();
-          const dateKey = data.date;
+    // Set up real-time listener to the collection
+    const unsubscribe = onSnapshot(
+      collection(db, "calendarEvents"),
+      (snapshot) => {
+        try {
+          const eventsByDate = {};
           
-          if (!eventsData[dateKey]) {
-            eventsData[dateKey] = [];
-          }
-          
-          eventsData[dateKey].push({
-            id: doc.id,
-            text: data.text,
-            user: data.user,
-            timestamp: data.timestamp?.toDate ? data.timestamp.toDate() : new Date()
+          snapshot.forEach((doc) => {
+            const data = doc.data();
+            const dateKey = data.date;
+            
+            if (!eventsByDate[dateKey]) {
+              eventsByDate[dateKey] = [];
+            }
+            
+            eventsByDate[dateKey].push({
+              id: doc.id,
+              text: data.text,
+              user: data.user,
+              timestamp: data.timestamp ? data.timestamp.toDate() : new Date()
+            });
           });
-        });
-        
-        // Sort events for each date by timestamp
-        Object.keys(eventsData).forEach(dateKey => {
-          eventsData[dateKey].sort((a, b) => b.timestamp - a.timestamp);
-        });
-        
-        console.log("Loaded events data:", eventsData);
-        setEvents(eventsData);
-        setLoading(false);
-        setError(null);
-      } catch (error) {
-        console.error("Error processing calendar events:", error);
-        setError("Failed to load events. Please refresh the page.");
+          
+          // Sort events for each date
+          Object.keys(eventsByDate).forEach(dateKey => {
+            eventsByDate[dateKey].sort((a, b) => b.timestamp - a.timestamp);
+          });
+          
+          setEvents(eventsByDate);
+          setLoading(false);
+        } catch (error) {
+          console.error("Error processing calendar events:", error);
+          setError("Failed to load events. Please refresh the page.");
+          setLoading(false);
+        }
+      },
+      (error) => {
+        console.error("Error listening to calendar events:", error);
+        setError("Failed to connect to the database. Please refresh the page.");
         setLoading(false);
       }
-    }, (error) => {
-      console.error("Error listening to calendar events:", error);
-      setError("Failed to connect to the database. Please refresh the page.");
-      setLoading(false);
-    });
+    );
     
     // Clean up listener on component unmount
     return () => unsubscribe();
@@ -98,25 +90,19 @@ function CalendarComponent({ currentUser }) {
     }
 
     try {
-      setError(null);
       const dateStr = formatDate(date);
       
-      // Create the event object
-      const eventData = {
+      // Add to Firestore
+      await addDoc(collection(db, "calendarEvents"), {
         date: dateStr,
         text: newEvent.trim(),
         user: currentUser,
         timestamp: Timestamp.now()
-      };
-      
-      console.log("Adding event to Firestore:", eventData);
-      
-      // Add to Firestore
-      const docRef = await addDoc(collection(db, "calendarEvents"), eventData);
-      console.log("Document written with ID: ", docRef.id);
+      });
       
       // Clear input field
       setNewEvent('');
+      setError(null);
     } catch (error) {
       console.error("Error adding event:", error);
       setError("Failed to add event. Please try again.");
@@ -124,31 +110,15 @@ function CalendarComponent({ currentUser }) {
   };
 
   const deleteEvent = async (eventId) => {
+    if (!currentUser) {
+      setError('Please sign in to delete events!');
+      return;
+    }
+    
     try {
+      // Direct deletion without ownership check (handle this based on your security rules)
+      await deleteDoc(doc(db, "calendarEvents", eventId));
       setError(null);
-      
-      // Get the event to check ownership
-      const eventRef = doc(db, "calendarEvents", eventId);
-      const eventSnap = await getDoc(eventRef);
-      
-      if (eventSnap.exists()) {
-        const eventData = eventSnap.data();
-        
-        // Only allow deletion if current user matches the event creator
-        if (currentUser !== eventData.user) {
-          setError("You can only delete events you've added!");
-          return;
-        }
-        
-        console.log("Deleting event with ID:", eventId);
-        
-        // Delete from Firestore
-        await deleteDoc(eventRef);
-        console.log("Event successfully deleted");
-      } else {
-        console.error("Event not found:", eventId);
-        setError("Event not found. It may have been deleted already.");
-      }
     } catch (error) {
       console.error("Error deleting event:", error);
       setError("Failed to delete event. Please try again.");
