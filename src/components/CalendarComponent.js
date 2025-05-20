@@ -7,74 +7,57 @@ import {
   addDoc, 
   deleteDoc, 
   doc, 
-  query, 
-  Timestamp, 
   onSnapshot 
 } from 'firebase/firestore';
 
 function CalendarComponent({ currentUser }) {
   const [date, setDate] = useState(new Date());
-  const [events, setEvents] = useState({});
+  const [events, setEvents] = useState([]);
   const [newEvent, setNewEvent] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Format date consistently
+  // Format date consistently for display and storage
   const formatDate = (date) => {
     const d = new Date(date);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   };
 
-  // Load events from Firestore
+  // Load all events from Firestore
   useEffect(() => {
-    // Set up real-time listener to the collection
-    const unsubscribe = onSnapshot(
-      collection(db, "calendarEvents"),
-      (snapshot) => {
-        try {
-          const eventsByDate = {};
-          
-          snapshot.forEach((doc) => {
-            const data = doc.data();
-            const dateKey = data.date;
-            
-            if (!eventsByDate[dateKey]) {
-              eventsByDate[dateKey] = [];
-            }
-            
-            eventsByDate[dateKey].push({
-              id: doc.id,
-              text: data.text,
-              user: data.user,
-              timestamp: data.timestamp ? data.timestamp.toDate() : new Date()
-            });
+    const eventsCollection = collection(db, "events");
+    const unsubscribe = onSnapshot(eventsCollection, (snapshot) => {
+      try {
+        const allEvents = [];
+        snapshot.forEach((doc) => {
+          allEvents.push({
+            id: doc.id,
+            ...doc.data()
           });
-          
-          // Sort events for each date
-          Object.keys(eventsByDate).forEach(dateKey => {
-            eventsByDate[dateKey].sort((a, b) => b.timestamp - a.timestamp);
-          });
-          
-          setEvents(eventsByDate);
-          setLoading(false);
-        } catch (error) {
-          console.error("Error processing calendar events:", error);
-          setError("Failed to load events. Please refresh the page.");
-          setLoading(false);
-        }
-      },
-      (error) => {
-        console.error("Error listening to calendar events:", error);
-        setError("Failed to connect to the database. Please refresh the page.");
+        });
+        
+        setEvents(allEvents);
+        setLoading(false);
+      } catch (err) {
+        console.error("Error loading events:", err);
+        setError("Failed to load events");
         setLoading(false);
       }
-    );
+    }, (err) => {
+      console.error("Snapshot error:", err);
+      setError("Failed to connect to database");
+      setLoading(false);
+    });
     
-    // Clean up listener on component unmount
     return () => unsubscribe();
   }, []);
 
-  const onChange = (newDate) => {
+  // Filter events for the selected date
+  const getEventsForDate = (dateStr) => {
+    return events.filter(event => event.date === dateStr);
+  };
+
+  const handleDateChange = (newDate) => {
     setDate(newDate);
   };
 
@@ -92,20 +75,18 @@ function CalendarComponent({ currentUser }) {
     try {
       const dateStr = formatDate(date);
       
-      // Add to Firestore
-      await addDoc(collection(db, "calendarEvents"), {
+      await addDoc(collection(db, "events"), {
         date: dateStr,
         text: newEvent.trim(),
         user: currentUser,
-        timestamp: Timestamp.now()
+        created: new Date().toISOString()
       });
       
-      // Clear input field
       setNewEvent('');
       setError(null);
-    } catch (error) {
-      console.error("Error adding event:", error);
-      setError("Failed to add event. Please try again.");
+    } catch (err) {
+      console.error("Error adding event:", err);
+      setError("Failed to add event");
     }
   };
 
@@ -116,12 +97,11 @@ function CalendarComponent({ currentUser }) {
     }
     
     try {
-      // Direct deletion without ownership check (handle this based on your security rules)
-      await deleteDoc(doc(db, "calendarEvents", eventId));
+      await deleteDoc(doc(db, "events", eventId));
       setError(null);
-    } catch (error) {
-      console.error("Error deleting event:", error);
-      setError("Failed to delete event. Please try again.");
+    } catch (err) {
+      console.error("Error deleting event:", err);
+      setError("Failed to delete event");
     }
   };
 
@@ -131,15 +111,16 @@ function CalendarComponent({ currentUser }) {
     }
   };
 
-  // Determine dates with events for highlighting on calendar
+  // Check if a date has events (for calendar tile styling)
   const tileClassName = ({ date, view }) => {
     if (view === 'month') {
       const dateStr = formatDate(date);
-      return events[dateStr] && events[dateStr].length > 0 ? 'has-events' : null;
+      const hasEvents = events.some(event => event.date === dateStr);
+      return hasEvents ? 'has-events' : null;
     }
   };
 
-  // Custom styles to override react-calendar default styles
+  // Apply calendar styles
   useEffect(() => {
     const style = document.createElement('style');
     style.innerHTML = `
@@ -178,6 +159,9 @@ function CalendarComponent({ currentUser }) {
     };
   }, []);
 
+  // Get events for the selected date
+  const currentDateEvents = getEventsForDate(formatDate(date));
+
   return (
     <div className="container">
       <h2>Times we have done the deed</h2>
@@ -203,7 +187,7 @@ function CalendarComponent({ currentUser }) {
           </div>
         ) : (
           <Calendar 
-            onChange={onChange} 
+            onChange={handleDateChange} 
             value={date} 
             tileClassName={tileClassName}
           />
@@ -269,14 +253,14 @@ function CalendarComponent({ currentUser }) {
             </h4>
             {loading ? (
               <p>Loading events...</p>
-            ) : events[formatDate(date)] && events[formatDate(date)].length > 0 ? (
+            ) : currentDateEvents.length > 0 ? (
               <ul style={{
                 listStyleType: 'none', 
                 padding: 0,
                 maxHeight: '250px',
                 overflowY: 'auto'
               }}>
-                {events[formatDate(date)].map((event) => (
+                {currentDateEvents.map((event) => (
                   <li key={event.id} style={{
                     margin: '8px 0',
                     padding: '10px',
@@ -321,26 +305,3 @@ function CalendarComponent({ currentUser }) {
                           height: '20px',
                           fontSize: '12px',
                           cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center'
-                        }}
-                        title="Delete this event"
-                      >
-                        ✕
-                      </button>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p style={{color: '#666', fontStyle: 'italic'}}>No events yet for this date</p>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-export default CalendarComponent;
