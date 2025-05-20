@@ -8,8 +8,8 @@ import {
   query, 
   orderBy, 
   Timestamp, 
-  onSnapshot, 
-  where 
+  onSnapshot,
+  where
 } from 'firebase/firestore';
 
 function StickyNoteBoard({ currentUser }) {
@@ -17,6 +17,7 @@ function StickyNoteBoard({ currentUser }) {
   const [newNote, setNewNote] = useState('');
   const [noteColor, setNoteColor] = useState('#ffff99'); // Default yellow
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const colors = [
     { value: '#ffff99', label: 'Yellow' },
@@ -26,80 +27,110 @@ function StickyNoteBoard({ currentUser }) {
     { value: '#ffcc99', label: 'Orange' }
   ];
 
-  // Load notes from Firestore on component mount - use statusUpdates collection
+  // Load notes from statusUpdates collection with a filter for sticky notes
   useEffect(() => {
-    // Filter for only sticky note type documents
+    console.log("Setting up sticky notes listener...");
+    
+    // Filter for only sticky note type entries
     const q = query(
-      collection(db, "statusUpdates"), 
+      collection(db, "statusUpdates"),
       where("type", "==", "stickyNote"),
       orderBy("timestamp", "desc")
     );
     
+    console.log("Query configured. Listening for updates...");
+    
     // Set up real-time listener
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
       try {
+        console.log("Received sticky notes update, docs count:", querySnapshot.size);
+        
         const notesList = querySnapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data(),
-          timestamp: doc.data().timestamp.toDate().toLocaleString() // Convert Firestore timestamp
+          timestamp: doc.data().timestamp?.toDate 
+            ? doc.data().timestamp.toDate().toLocaleString() 
+            : new Date().toLocaleString()
         }));
+        
+        console.log("Processed notes:", notesList);
         setNotes(notesList);
         setLoading(false);
       } catch (error) {
         console.error("Error processing notes:", error);
+        setError("Failed to load notes. Please refresh the page.");
         setLoading(false);
       }
     }, (error) => {
       console.error("Error listening to notes:", error);
+      setError("Failed to connect to the database. Please refresh the page.");
       setLoading(false);
     });
     
     // Clean up listener on component unmount
-    return () => unsubscribe();
+    return () => {
+      console.log("Cleaning up sticky notes listener");
+      unsubscribe();
+    };
   }, []);
 
   const addNote = async () => {
-    if (newNote.trim() && currentUser) {
-      try {
-        // Create new note with Firestore timestamp
-        const newNoteData = {
-          text: newNote,
-          color: noteColor,
-          user: currentUser,
-          timestamp: Timestamp.now(),
-          type: "stickyNote", // Add type field to differentiate from other statusUpdates
-          emoji: "📝" // Add emoji for compatibility with StatusUpdate component
-        };
-        
-        // Add to statusUpdates collection instead
-        await addDoc(collection(db, "statusUpdates"), newNoteData);
-        
-        // Clear input field
-        setNewNote('');
-      } catch (error) {
-        console.error("Error adding sticky note:", error);
-        alert("Failed to add note. Please try again.");
-      }
-    } else if (!currentUser) {
-      alert('Please sign in to add a note!');
-    } else {
-      alert('Please enter some text for your note!');
+    if (!currentUser) {
+      setError('Please sign in to add a note!');
+      return;
+    }
+    
+    if (!newNote.trim()) {
+      setError('Please enter some text for your note!');
+      return;
+    }
+
+    try {
+      console.log("Attempting to add sticky note");
+      
+      // Create new note with Firestore timestamp
+      const newNoteData = {
+        type: "stickyNote", // Add type field to differentiate from other statusUpdates
+        text: newNote.trim(),
+        color: noteColor,
+        user: currentUser,
+        timestamp: Timestamp.now(),
+        emoji: "📝" // Add emoji for compatibility with StatusUpdate component
+      };
+      
+      console.log("Prepared note data:", newNoteData);
+      
+      // Add to statusUpdates collection
+      const docRef = await addDoc(collection(db, "statusUpdates"), newNoteData);
+      console.log("Note added successfully with ID:", docRef.id);
+      
+      // Clear input field and error
+      setNewNote('');
+      setError(null);
+    } catch (error) {
+      console.error("Error adding sticky note:", error);
+      setError("Failed to add note. Please try again.");
     }
   };
 
   const removeNote = async (id, noteUser) => {
     // Only allow deletion if current user matches the note creator
     if (currentUser !== noteUser) {
-      alert("You can only delete your own notes!");
+      setError("You can only delete your own notes!");
       return;
     }
     
     try {
+      console.log("Attempting to delete note with ID:", id);
+      
       // Delete from statusUpdates collection
       await deleteDoc(doc(db, "statusUpdates", id));
+      console.log("Note deleted successfully");
+      
+      setError(null);
     } catch (error) {
       console.error("Error deleting note:", error);
-      alert("Failed to delete note. Please try again.");
+      setError("Failed to delete note. Please try again.");
     }
   };
 
@@ -125,6 +156,21 @@ function StickyNoteBoard({ currentUser }) {
   return (
     <div className="container">
       <h2>Sticky Notes</h2>
+      
+      {error && (
+        <div style={{
+          padding: '10px',
+          margin: '10px 0',
+          backgroundColor: '#fff0f0',
+          border: '1px solid #ffcccc',
+          borderRadius: '4px',
+          color: '#cc0000',
+          textAlign: 'center'
+        }}>
+          {error}
+        </div>
+      )}
+      
       <div style={{textAlign: 'center', marginBottom: '20px'}}>
         <textarea
           value={newNote}
@@ -153,7 +199,7 @@ function StickyNoteBoard({ currentUser }) {
             disabled={!currentUser || !newNote.trim()}
             style={{
               padding: '8px 16px',
-              backgroundColor: '#4CAF50',
+              backgroundColor: !currentUser || !newNote.trim() ? '#cccccc' : '#4CAF50',
               color: 'white',
               border: 'none',
               borderRadius: '4px',
