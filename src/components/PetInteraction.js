@@ -265,7 +265,7 @@ function PetInteraction({ currentUser }) {
         <div style={{display: 'flex', justifyContent: 'center', gap: '30px', margin: '20px 0'}}>
           <div>
             <img
-              src="/path/to/tobi.jpg" // Replace with actual image path
+              src="/Users/seanmorris/Desktop/sean-commits/src/IMG_0076.JPG" // Replace with actual image path
               alt="Tobi"
               onClick={handleTobiClick}
               className={tobiDancing ? 'dancing' : ''}
@@ -289,7 +289,7 @@ function PetInteraction({ currentUser }) {
           
           <div>
             <img
-              src="/path/to/hachi.jpg" // Replace with actual image path
+              src="/Users/seanmorris/Desktop/sean-commits/src/A5FA0E8A-3ABD-44E4-8F28-4A51B484DB8A.JPG" // Replace with actual image path
               alt="Hachi"
               onClick={handleHachiClick}
               className={hachiDancing ? 'dancing' : ''}
